@@ -16,7 +16,7 @@ import pickle as pkl
 #                     datefmt='%a, %d %b %Y %H:%M:%S',
 #                     )
 
-class loadFolders(object):  # 迭代器
+class loadFolders(object):  #迭代器
     def __init__(self, par_path):
         self.par_path = par_path
 
