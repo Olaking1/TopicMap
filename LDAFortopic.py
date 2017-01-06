@@ -89,7 +89,6 @@ def rm_tokens(words):  # 去掉一些停用词和数字
             words_list.pop(i)
     return words_list
 
-
 def get_stop_words(path='/Users/liyue/Documents/datasets/stop_words'):
     file = open(path, 'r')
     file = file.read().split('\n')
@@ -192,7 +191,7 @@ if __name__ == '__main__':
     else:
         print('=== 检测到tfidf向量已经生成，跳过该阶段 ===')
 
-    # # ===================================================================
+    # # ====================================================================
     # # # # 第三阶段，  开始将tfidf转化成lda
     if not os.path.exists(path_tmp_lda):
         print('=== 未检测到有lda文件夹存在，开始生成lda向量 ===')
