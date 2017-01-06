@@ -293,7 +293,7 @@ if __name__ == '__main__':
     for i, similarities in zip(range(len(dictionary)), index):
         file.writelines("======================================")
         file.write('\r\n')
-        file.writelines("%d 与 %s相似的文档为："%(i, filenames[i]))
+        file.writelines("%d 与%s相似的文档为："%(i, filenames[i]))
         file.write('\r\n')
         boolSimi = similarities > 0.7
         for j in range(len(boolSimi)):
