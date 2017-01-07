@@ -10,13 +10,13 @@ import os, re, time, logging
 import jieba
 import pickle as pkl
 
-
 # logging.basicConfig(level=logging.WARNING,
 #                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
 #                     datefmt='%a, %d %b %Y %H:%M:%S',
 #                     )
 
-class loadFolders(object):  # 迭代器
+
+class loadFolders(object):
     def __init__(self, par_path):
         self.par_path = par_path
 
@@ -54,11 +54,12 @@ class loadFiles(object):
 def convert_doc_to_wordlist(str_doc, cut_all):
     sent_list = str(str_doc).split('\n')
     # sent_list = map(rm_char, sent_list)  # 去掉一些字符，例如中文空格
-    jieba.load_userdict('../../datasets/use_words')
+    jieba.load_userdict('use_words')
     word_2dlist = [rm_tokens(jieba.cut(re.sub("\p{P}+", "", part.lower()), cut_all=cut_all)) for part in
-                   sent_list]  #分词
+                   sent_list]  # 分词
     word_list = sum(word_2dlist, [])
     return word_list
+
 
 def rm_tokens(words):  # 去掉一些停用词和数字
     words_list = list(words)
@@ -78,11 +79,10 @@ def rm_tokens(words):  # 去掉一些停用词和数字
             words_list.pop(i)
         # elif words_list[i].isspace():
         #     words_list.pop(i)
-        # words_list[i] = gensim.parsing.preprocessing.strip_punctuation(words_list[i])
     return words_list
 
 
-def get_stop_words(path='../../datasets/stop_words'):
+def get_stop_words(path='stop_words'):
     file = open(path, 'r', encoding='utf-8')
     file = file.read().split('\n')
     return set(file)
@@ -125,6 +125,7 @@ if __name__ == '__main__':
                 catg = msg[0]
                 filename = msg[1]
                 file = msg[2]
+                file = file + filename*10
                 file = convert_doc_to_wordlist(file, cut_all=False)
                 dictionary.add_documents([file])
                 filenames.append(filename)
@@ -133,7 +134,7 @@ if __name__ == '__main__':
                           .format(i=i, t=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())))
         print("去掉出现次数过多或过少的词前，字典长度为：" + str(len(dictionary)))
         # 去掉词典中出现次数过少或过多的
-        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 20]
+        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 15]
         dictionary.filter_tokens(small_freq_ids)
         dictionary.compactify()
         dictionary.save(path_dictionary)
@@ -274,7 +275,7 @@ if __name__ == '__main__':
     gamma = lda_model.do_estep(corpus, state=lda_model.state)
     lda_model.update_alpha(gamma, 0.7)
     ldaState = models.ldamodel.LdaState(eta=0.7, shape=(lda_model.num_topics, lda_model.num_terms))
-    lda_model.optimize_eta = True
+    # lda_model.optimize_eta = True
     lda_model.do_mstep(rho=0.3, other=ldaState)
     topic = lda_model.show_topics(n_topic, 5)
     print(topic)
@@ -294,9 +295,12 @@ if __name__ == '__main__':
     #             file.write('\r\n')
     # file.close()
 
-    documentTopic = lda_model.get_document_topics(corpus[2],minimum_phi_value=0.02)
-    topicList = lda_model.get_topic_terms(1,10)
-    for i in range(len(documentTopic)):
-        print(dictionary[documentTopic[i][0]])
+    for j in range(10):
+        documentTopic = lda_model.get_document_topics(corpus[j],minimum_phi_value=0.02)
+        topicList = lda_model.get_topic_terms(1,10)
+        documentTopic.sort(key=lambda x:x[1], reverse=True)
+        print(filenames[j])
+        print(documentTopic[0])
+        print("=============")
 
     print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
