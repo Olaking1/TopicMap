@@ -87,21 +87,36 @@ def get_stop_words(path='stop_words'):
     file = file.read().split('\n')
     return set(file)
 
+def accuracy(filenames, fileTopicList): # 计算分类的正确性
+    count = 0
+    # *5
+    # docsTopic = ['hbase','docker','mysql','hadoop','docker','zookeeper','linux','mysql']
+    # *10
+    # docsTopic = ['mongodb','hadoop','mongodb','mysql','zookeeper','hbase','zookeeper','hadoop']
+    # *7
+    docsTopic = ['mybatis','hbase','mongodb','mongodb','mysql','linux','zookeeper','hadoop']
+    for i in range(len(filenames)):
+        if filenames[i].__contains__(docsTopic[fileTopicList[i][0][0]]):
+            count = count+1
+
+    return count/len(filenames)
+
+
 # def rm_char(text):
 #     text = re.sub(' ', '', text)
 #     return text
 
 if __name__ == '__main__':
-    path_doc_root = '../../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
-    path_tmp = '../../datasets/csdn_tmp'  # 存放中间结果的位置
+    path_doc_root = '../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
+    path_tmp = '../datasets/csdn_tmp'  # 存放中间结果的位置
     path_dictionary = os.path.join(path_tmp, 'THUNews.dict')
     path_tmp_corpus = os.path.join(path_tmp, 'corpus')
     path_tmp_tfidf = os.path.join(path_tmp, 'tfidf_corpus')
     path_tmp_lda = os.path.join(path_tmp, 'lda_corpus')
     path_tmp_ldamodel = os.path.join(path_tmp, 'lda_model.pkl')
     path_tmp_predictor = os.path.join(path_tmp, 'predictor.pkl')
-    n = 1  # n 表示抽样率， n抽1
-    n_topic = 9
+    n = 10  # n 表示抽样率， n抽1
+    n_topic = 8
 
     dictionary = None
     corpus = []
@@ -125,7 +140,7 @@ if __name__ == '__main__':
                 catg = msg[0]
                 filename = msg[1]
                 file = msg[2]
-                file = file + filename*10
+                file = file + filename*7
                 file = convert_doc_to_wordlist(file, cut_all=False)
                 dictionary.add_documents([file])
                 filenames.append(filename)
@@ -295,12 +310,17 @@ if __name__ == '__main__':
     #             file.write('\r\n')
     # file.close()
 
-    for j in range(10):
-        documentTopic = lda_model.get_document_topics(corpus[j],minimum_phi_value=0.02)
+    fileTopicList = []
+    for j in range(len(filenames)):
+        fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
         topicList = lda_model.get_topic_terms(1,10)
-        documentTopic.sort(key=lambda x:x[1], reverse=True)
-        print(filenames[j])
-        print(documentTopic[0])
-        print("=============")
+        fileTopic.sort(key=lambda x:x[1], reverse=True)
+        fileTopicList.append(fileTopic)
+        # print(filenames[j])
+        # print(fileTopic[0])
+        # print("=============")
+
+    accuracy = accuracy(filenames, fileTopicList)
+    print(accuracy)
 
     print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
