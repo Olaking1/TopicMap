@@ -9,6 +9,8 @@ import string
 import os, re, time, logging
 import jieba
 import pickle as pkl
+import networkx as nx
+import matplotlib.pyplot as plt
 
 # logging.basicConfig(level=logging.WARNING,
 #                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
@@ -115,7 +117,7 @@ if __name__ == '__main__':
     path_tmp_lda = os.path.join(path_tmp, 'lda_corpus')
     path_tmp_ldamodel = os.path.join(path_tmp, 'lda_model.pkl')
     path_tmp_predictor = os.path.join(path_tmp, 'predictor.pkl')
-    n = 10  # n 表示抽样率， n抽1
+    n = 1  # n 表示抽样率， n抽1
     n_topic = 8
 
     dictionary = None
@@ -294,33 +296,26 @@ if __name__ == '__main__':
     lda_model.do_mstep(rho=0.3, other=ldaState)
     topic = lda_model.show_topics(n_topic, 5)
     print(topic)
-    # index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus,
-    #                                        num_features=len(dictionary))
-    # filePath = os.path.join(path_tmp,'similaritiesFiles')
-    # file = open(filePath, 'a', encoding='utf-8')
-    # for i, similarities in zip(range(len(dictionary)), index):
-    #     file.writelines("================================================")
-    #     file.write('\r\n')
-    #     file.writelines("【【【%d 与 %s相似的文档为：】】】"%(i, filenames[i]))
-    #     file.write('\r\n')
-    #     boolSimi = similarities > 0.85
-    #     for j in range(len(boolSimi)):
-    #         if(boolSimi[j]):
-    #             file.writelines(str(similarities[j])+":"+filenames[j])
-    #             file.write('\r\n')
-    # file.close()
 
-    fileTopicList = []
-    for j in range(len(filenames)):
-        fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
-        topicList = lda_model.get_topic_terms(1,10)
-        fileTopic.sort(key=lambda x:x[1], reverse=True)
-        fileTopicList.append(fileTopic)
-        # print(filenames[j])
-        # print(fileTopic[0])
-        # print("=============")
+    graph = nx.Graph()
+    index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus,
+                                           num_features=len(dictionary))
+    for i, similarities in zip(range(len(dictionary)), index):
+        for j in range(len(similarities)):
+            if(similarities[j] >0.70 and similarities[j] < 0.99):
+                graph.add_edge(filenames[i],filenames[j], weight=similarities[j])
+    pos = nx.spring_layout(graph)
+    nx.draw(graph, pos)
+    plt.show()
 
-    accuracy = accuracy(filenames, fileTopicList)
-    print(accuracy)
-
-    print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
+    # fileTopicList = []
+    # for j in range(len(filenames)):
+    #     fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
+    #     topicList = lda_model.get_topic_terms(1,10)
+    #     fileTopic.sort(key=lambda x:x[1], reverse=True)
+    #     fileTopicList.append(fileTopic)
+    #
+    # accuracy = accuracy(filenames, fileTopicList)
+    # print(accuracy)
+    #
+    # print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
