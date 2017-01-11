@@ -2,9 +2,7 @@
 import gensim
 from gensim import corpora, models, similarities
 from scipy.sparse import csr_matrix
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import numpy as np
-# import regex as re
 import string
 import os, re, time, logging
 import jieba
@@ -46,9 +44,6 @@ class loadFiles(object):
                     except UnicodeDecodeError:
                         print(file_path)
                         content = ''
-                        # this_file = open(file_path, 'rb')
-                        # content = this_file.read()
-                        this_file.close()
                     yield catg, file, content
                     this_file.close()
 
@@ -79,8 +74,6 @@ def rm_tokens(words):  # 去掉一些停用词和数字
             words_list.pop(i)
         elif words_list[i].isdigit():
             words_list.pop(i)
-        # elif words_list[i].isspace():
-        #     words_list.pop(i)
     return words_list
 
 
@@ -95,18 +88,12 @@ def accuracy(filenames, fileTopicList): # 计算分类的正确性
     # docsTopic = ['hbase','docker','mysql','hadoop','docker','zookeeper','linux','mysql']
     # *10
     # docsTopic = ['mongodb','hadoop','mongodb','mysql','zookeeper','hbase','zookeeper','hadoop']
-    # *7
-    docsTopic = ['mybatis','hbase','mongodb','mongodb','mysql','linux','zookeeper','hadoop']
+    docsTopic = ['docker','mybatis','hadoop','mongodb','mybatis','linux','zookeeper','hbase']
     for i in range(len(filenames)):
-        if filenames[i].__contains__(docsTopic[fileTopicList[i][0][0]]):
+        if filenames[i].lower().__contains__(docsTopic[fileTopicList[i][0]]):
             count = count+1
-
     return count/len(filenames)
 
-
-# def rm_char(text):
-#     text = re.sub(' ', '', text)
-#     return text
 
 if __name__ == '__main__':
     path_doc_root = '../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
@@ -117,7 +104,8 @@ if __name__ == '__main__':
     path_tmp_lda = os.path.join(path_tmp, 'lda_corpus')
     path_tmp_ldamodel = os.path.join(path_tmp, 'lda_model.pkl')
     path_tmp_predictor = os.path.join(path_tmp, 'predictor.pkl')
-    n = 1  # n 表示抽样率， n抽1
+    path_temp_filenames = os.path.join(path_tmp, 'filenames')
+    n = 5  # n 表示抽样率， n抽1
     n_topic = 8
 
     dictionary = None
@@ -133,6 +121,7 @@ if __name__ == '__main__':
     # # ===================================================================
     # # # # 第一阶段，  遍历文档，生成词典,并去掉频率较少的项
     #       如果指定的位置没有词典，则重新生成一个。如果有，则跳过该阶段
+    t0 = time.time()
     if not os.path.exists(path_dictionary):
         print('=== 未检测到有词典存在，开始遍历生成词典 ===')
         dictionary = corpora.Dictionary()
@@ -143,12 +132,18 @@ if __name__ == '__main__':
                 filename = msg[1]
                 file = msg[2]
                 file = file + filename*7
-                file = convert_doc_to_wordlist(file, cut_all=False)
-                dictionary.add_documents([file])
+                word_list = convert_doc_to_wordlist(file, cut_all=False)
+                dictionary.add_documents([word_list])
                 filenames.append(filename)
                 if int(i / n) % 1000 == 0:
                     print('{t} *** {i} \t docs has been dealed'
                           .format(i=i, t=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())))
+        # 将filenames写入文件，方便以后使用
+        if(not os.path.exists(path_temp_filenames)):
+            filenames_file = open(path_temp_filenames,'w', encoding='utf-8')
+            filenames_file.write(str(filenames))
+            filenames_file.close()
+
         print("去掉出现次数过多或过少的词前，字典长度为：" + str(len(dictionary)))
         # 去掉词典中出现次数过少或过多的
         small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 15]
@@ -159,6 +154,8 @@ if __name__ == '__main__':
         print('=== 词典已经生成 ===')
     else:
         print('=== 检测到词典已经存在，跳过该阶段 ===')
+    t1 = time.time()
+    print("第一阶段用时：%d" % (t1-t0))
 
     # # ===================================================================
     # # # # 第二阶段，  开始将文档转化成tfidf
@@ -200,6 +197,8 @@ if __name__ == '__main__':
         print('=== tfidf向量已经生成 ===')
     else:
         print('=== 检测到tfidf向量已经生成，跳过该阶段 ===')
+    t2 = time.time()
+    print("第二阶段用时：%d" % (t2-t1))
 
     # # ===================================================================
     # # # # 第三阶段，  开始将tfidf转化成lda
@@ -234,6 +233,12 @@ if __name__ == '__main__':
             corpus_tfidf_total += tmp
         lda_model = models.LdaModel(corpus=corpus_tfidf_total, id2word=dictionary, num_topics=n_topic, alpha='auto',
                                     eval_every=1)
+        gamma = lda_model.do_estep(corpus, state=lda_model.state)
+        lda_model.update_alpha(gamma, 0.7)
+        ldaState = models.ldamodel.LdaState(eta=0.7, shape=(lda_model.num_topics, lda_model.num_terms))
+        # lda_model.optimize_eta = True
+        lda_model.do_mstep(rho=0.3, other=ldaState)
+
         # 将lda模型存储到磁盘上
         lda_file = open(path_tmp_ldamodel, 'wb')
         pkl.dump(lda_model, lda_file)
@@ -253,6 +258,8 @@ if __name__ == '__main__':
         print('=== lda向量已经生成 ===')
     else:
         print('=== 检测到lda向量已经生成，跳过该阶段 ===')
+    t3 = time.time()
+    print("第三阶段用时：%d" % (t3-t2))
 
     # # ===================================================================
     # # # # 第四阶段，  计算文档之间的相似度
@@ -279,33 +286,34 @@ if __name__ == '__main__':
         lda_file = open(path_tmp_ldamodel, "rb")
         lda_model = pkl.load(lda_file, encoding="utf-8")
         print('--- lda文档读取完毕，开始进行分类 ---')
+    t4 = time.time()
+    print("第四阶段用时：%d" % (t4-t3))
 
-    doc = []
-    if(len(filenames) == 0):
-        files = loadFiles(path_doc_root)
-        for i, msg in enumerate(files):
-            if i % n == 0:
-                filename = msg[1]
-                filenames.append(filename)
-                doc.append(msg[2])
-
-    gamma = lda_model.do_estep(corpus, state=lda_model.state)
-    lda_model.update_alpha(gamma, 0.7)
-    ldaState = models.ldamodel.LdaState(eta=0.7, shape=(lda_model.num_topics, lda_model.num_terms))
-    # lda_model.optimize_eta = True
-    lda_model.do_mstep(rho=0.3, other=ldaState)
     topic = lda_model.show_topics(n_topic, 5)
     print(topic)
+
+    # 从文件中读取filenames并转化为列表形式
+    f = open(path_temp_filenames, 'r', encoding='utf-8')
+    filenames = f.read()
+    filenames = filenames.replace('[', '').replace(']', '').replace(' ', '').split(',')
 
     graph = nx.Graph()
     index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus,
                                            num_features=len(dictionary))
-    for i, similarities in zip(range(len(dictionary)), index):
+    for i, similarities in zip(range(len(filenames)), index):
+        fileTopicI = lda_model.get_document_topics(corpus[i], minimum_phi_value=0.02)
+        fileTopicI.sort(key=lambda x: x[1], reverse=True)
         for j in range(len(similarities)):
             if(similarities[j] >0.70 and similarities[j] < 0.99):
+                graph.add_node(filenames[i], topic=fileTopicI[0][0])
                 graph.add_edge(filenames[i],filenames[j], weight=similarities[j])
     pos = nx.spring_layout(graph)
-    nx.draw(graph, pos)
+    elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >=0.75]
+    esmall = [(u, v) for (u, v , d) in graph.edges(data=True) if d['weight'] <0.75]
+    nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
+    nx.draw_networkx_nodes(graph, pos, node_color=nodeColor, node_size=100)
+    nx.draw_networkx_edges(graph, pos, edgelist = elarge, width = 1, with_labels=False)
+    nx.draw_networkx_edges(graph, pos, edgelist = esmall, width = 1, style='dashed', with_labels=False)
     plt.show()
 
     # fileTopicList = []
@@ -313,7 +321,7 @@ if __name__ == '__main__':
     #     fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
     #     topicList = lda_model.get_topic_terms(1,10)
     #     fileTopic.sort(key=lambda x:x[1], reverse=True)
-    #     fileTopicList.append(fileTopic)
+    #     fileTopicList.append(fileTopic[0])
     #
     # accuracy = accuracy(filenames, fileTopicList)
     # print(accuracy)
