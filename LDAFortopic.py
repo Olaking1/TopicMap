@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import gensim
 from gensim import corpora, models, similarities
+from sklearn.cluster import KMeans
 from scipy.sparse import csr_matrix
 import numpy as np
 import string
@@ -84,14 +85,14 @@ def get_stop_words(path='stop_words'):
 
 def accuracy(filenames, fileTopicList): # 计算分类的正确性
     count = 0
-    # *5
-    # docsTopic = ['hbase','docker','mysql','hadoop','docker','zookeeper','linux','mysql']
-    # *10
-    # docsTopic = ['mongodb','hadoop','mongodb','mysql','zookeeper','hbase','zookeeper','hadoop']
-    docsTopic = ['docker','mybatis','hadoop','mongodb','mybatis','linux','zookeeper','hbase']
+    docsTopic = ['hadoop','linux','mysql','hbase','zookeeper','docker','mongodb','mongodb']
+    # docsTopic = ['hadoop','docker','hadoop','hbase','hadoop','linux','docker','mybatis','mongodb','mysql','zookeeper','linux']
     for i in range(len(filenames)):
-        if filenames[i].lower().__contains__(docsTopic[fileTopicList[i][0]]):
-            count = count+1
+        try:
+            if filenames[i].lower().__contains__(docsTopic[fileTopicList[i][0]]):
+                count = count+1
+        except Exception:
+            print(i)
     return count/len(filenames)
 
 
@@ -111,6 +112,7 @@ if __name__ == '__main__':
     dictionary = None
     corpus = []
     filenames = []
+    corpus_topic = []
     corpus_tfidf = None
     corpus_lda = None
     lda_model = None
@@ -126,23 +128,22 @@ if __name__ == '__main__':
         print('=== 未检测到有词典存在，开始遍历生成词典 ===')
         dictionary = corpora.Dictionary()
         files = loadFiles(path_doc_root)
+        filenames_file = open(path_temp_filenames, 'w', encoding='utf-8')
         for i, msg in enumerate(files):
             if i % n == 0:
                 catg = msg[0]
                 filename = msg[1]
                 file = msg[2]
-                file = file + filename*7
+                file = file + filename*5
                 word_list = convert_doc_to_wordlist(file, cut_all=False)
                 dictionary.add_documents([word_list])
                 filenames.append(filename)
+                # 将所有文件名存储到一个文件中，方便以后使用
+                filenames_file.writelines(filename+'\n')
                 if int(i / n) % 1000 == 0:
                     print('{t} *** {i} \t docs has been dealed'
                           .format(i=i, t=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())))
-        # 将filenames写入文件，方便以后使用
-        if(not os.path.exists(path_temp_filenames)):
-            filenames_file = open(path_temp_filenames,'w', encoding='utf-8')
-            filenames_file.write(str(filenames))
-            filenames_file.close()
+        filenames_file.close()
 
         print("去掉出现次数过多或过少的词前，字典长度为：" + str(len(dictionary)))
         # 去掉词典中出现次数过少或过多的
@@ -231,13 +232,8 @@ if __name__ == '__main__':
         for catg in catgs:
             tmp = corpus_tfidf.get(catg)
             corpus_tfidf_total += tmp
-        lda_model = models.LdaModel(corpus=corpus_tfidf_total, id2word=dictionary, num_topics=n_topic, alpha='auto',
-                                    eval_every=1)
-        gamma = lda_model.do_estep(corpus, state=lda_model.state)
-        lda_model.update_alpha(gamma, 0.7)
-        ldaState = models.ldamodel.LdaState(eta=0.7, shape=(lda_model.num_topics, lda_model.num_terms))
-        # lda_model.optimize_eta = True
-        lda_model.do_mstep(rho=0.3, other=ldaState)
+        lda_model = models.LdaModel(corpus=corpus_tfidf_total, id2word=dictionary, num_topics=n_topic, alpha=0.1,
+                                    eval_every=1, iterations=100)
 
         # 将lda模型存储到磁盘上
         lda_file = open(path_tmp_ldamodel, 'wb')
@@ -262,7 +258,7 @@ if __name__ == '__main__':
     print("第三阶段用时：%d" % (t3-t2))
 
     # # ===================================================================
-    # # # # 第四阶段，  计算文档之间的相似度
+    # # # # 第四阶段，  计算文档之间的相似度，并画图表示
     if not corpus_lda:  # 如果跳过了第三阶段
         print('--- 未检测到lda文档，开始从磁盘中读取 ---')
         files = os.listdir(path_tmp_lda)
@@ -289,41 +285,71 @@ if __name__ == '__main__':
     t4 = time.time()
     print("第四阶段用时：%d" % (t4-t3))
 
+    # gamma = lda_model.do_estep(corpus)
+    # lda_model.update_alpha(gamma, 0.7)
+    # ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
+    # # lda_model.optimize_eta = True
+    # lda_model.do_mstep(rho=0.7, other=ldaState)
     topic = lda_model.show_topics(n_topic, 5)
     print(topic)
 
+    # # ===================================================================
+    # # # # 第五阶段，  计算文档主题的准确率
     # 从文件中读取filenames并转化为列表形式
+    filenames = []
     f = open(path_temp_filenames, 'r', encoding='utf-8')
-    filenames = f.read()
-    filenames = filenames.replace('[', '').replace(']', '').replace(' ', '').split(',')
+    for line in f:
+        filenames.append(line.strip('\n'))
+    f.close()
 
+    fileTopicList = []
+    for j in range(len(filenames)):
+        fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
+        topicList = lda_model.get_topic_terms(1,10)
+        fileTopic.sort(key=lambda x:x[1], reverse=True)
+        fileTopicList.append(fileTopic[0])
+
+    accuracy = accuracy(filenames, fileTopicList)
+    print(accuracy)
+    print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
+
+    # ff = open('similarity','w',encoding='utf-8')
     graph = nx.Graph()
-    index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus,
-                                           num_features=len(dictionary))
-    for i, similarities in zip(range(len(filenames)), index):
+    doc_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus, num_features=len(dictionary))
+    for i, similars in zip(range(len(filenames)), doc_index):
         fileTopicI = lda_model.get_document_topics(corpus[i], minimum_phi_value=0.02)
         fileTopicI.sort(key=lambda x: x[1], reverse=True)
-        for j in range(len(similarities)):
-            if(similarities[j] >0.70 and similarities[j] < 0.99):
+        # ff.write("与<<"+filenames[i]+">>相似的文档有：")
+        # ff.write('\n')
+        for j in range(len(similars)):
+            if(similars[j] >0.75 and similars[j] < 0.99):
+                # ff.write(filenames[j]+"相似度为"+str(similarities[j]))
+                # ff.write('\n')
                 graph.add_node(filenames[i], topic=fileTopicI[0][0])
-                graph.add_edge(filenames[i],filenames[j], weight=similarities[j])
+                graph.add_edge(filenames[i],filenames[j], weight=similars[j])
+        # ff.write("============================")
+        # ff.write("\n")
+    # ff.close()
+
+    # # ===================================================================
+    # # # # 第五阶段，  计算主题之间的相似度
+    topn = 300
+    topic_term = []
+    for i in range(n_topic):
+        topic_term_pro = lda_model.get_topic_terms(i, topn=topn)
+        topic_term = [(id,pro) for (id, pro) in topic_term_pro]
+        corpus_topic.append(topic_term)
+    topic_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus_topic, num_features=len(dictionary))
+    for i, t_similars in zip(range(n_topic), topic_index):
+        for j in range(len(t_similars)):
+            if(t_similars[j]>0.5 and t_similars[j]<1.0):
+                print(str(i)+"--"+str(j)+"  "+str(t_similars[j]))
+
     pos = nx.spring_layout(graph)
-    elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >=0.75]
-    esmall = [(u, v) for (u, v , d) in graph.edges(data=True) if d['weight'] <0.75]
+    elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >=0.90]
+    esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] <0.90]
     nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
     nx.draw_networkx_nodes(graph, pos, node_color=nodeColor, node_size=100)
-    nx.draw_networkx_edges(graph, pos, edgelist = elarge, width = 1, with_labels=False)
-    nx.draw_networkx_edges(graph, pos, edgelist = esmall, width = 1, style='dashed', with_labels=False)
+    nx.draw_networkx_edges(graph, pos, edgelist=elarge, width=1, with_labels=False)
+    nx.draw_networkx_edges(graph, pos, edgelist=esmall, width=1, style='dashed', with_labels=False)
     plt.show()
-
-    # fileTopicList = []
-    # for j in range(len(filenames)):
-    #     fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
-    #     topicList = lda_model.get_topic_terms(1,10)
-    #     fileTopic.sort(key=lambda x:x[1], reverse=True)
-    #     fileTopicList.append(fileTopic[0])
-    #
-    # accuracy = accuracy(filenames, fileTopicList)
-    # print(accuracy)
-    #
-    # print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
