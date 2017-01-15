@@ -7,6 +7,7 @@ import numpy as np
 import string
 import os, re, time, logging
 import jieba
+import jieba.posseg
 import pickle as pkl
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -53,8 +54,14 @@ def convert_doc_to_wordlist(str_doc, cut_all):
     sent_list = str(str_doc).split('\n')
     # sent_list = map(rm_char, sent_list)  # 去掉一些字符，例如中文空格
     jieba.load_userdict('use_words')
-    word_2dlist = [rm_tokens(jieba.cut(re.sub("\p{P}+", "", part.lower()), cut_all=cut_all)) for part in
-                   sent_list]  # 分词
+    word_2dlist = []
+    for part in sent_list:
+        list_all = jieba.posseg.cut(part.lower())
+        list_numn = []
+        for i in list_all:
+            if(i.flag is 'n' or i.flag is 'eng' or i.flag is 'x'):
+                list_numn.append(i.word)
+        word_2dlist.append(rm_tokens(list_numn))
     word_list = sum(word_2dlist, [])
     return word_list
 
@@ -62,9 +69,7 @@ def convert_doc_to_wordlist(str_doc, cut_all):
 def rm_tokens(words):  # 去掉一些停用词和数字
     words_list = list(words)
     stop_words = get_stop_words()
-    str = ''
-    for i in range(len(string.punctuation)):
-        str += ' '
+    str = ' '*len(string.punctuation)
 
     for i in range(words_list.__len__())[::-1]:
         table = words_list[i].maketrans(string.punctuation, str)
@@ -85,8 +90,18 @@ def get_stop_words(path='stop_words'):
 
 def accuracy(filenames, fileTopicList): # 计算分类的正确性
     count = 0
-    docsTopic = ['hadoop','linux','mysql','hbase','zookeeper','docker','mongodb','mongodb']
-    # docsTopic = ['hadoop','docker','hadoop','hbase','hadoop','linux','docker','mybatis','mongodb','mysql','zookeeper','linux']
+    # docfre＝40 accuracy=57.21%
+    # docsTopic = ['linux','hbase','mysql','docker','mongodb','zookeeper','mysql','hadoop']
+    # docfre ＝ 50 accrucy＝59.24%
+    docsTopic = ['mybatis','linux','mongodb','docker','zookeeper','mysql','hbase','hadoop']
+    # docfre = 60 accuray=60.77%
+    # docsTopic = ['mybatis','docker','mongodb','hbase','mysql','hadoop','linux','zookeeper']
+    # docfre = 70 accuray=66.81%
+    # docsTopic = ['mongodb','zookeeper','hadoop','linux','hbase','docker','mybatis','mysql']
+    # docfre = 80 accuray=52.47%
+    docsTopic = ['mybatis', 'linux', 'docker', 'mysql', 'zookeeper', 'hadoop', 'hbase', 'mongodb']
+    # docfre = 90 accuray=52.47%
+    docsTopic = ['zookeeper','linux','mongodb','hbase','docker','zookeeper','hadoop','mysql']
     for i in range(len(filenames)):
         try:
             if filenames[i].lower().__contains__(docsTopic[fileTopicList[i][0]]):
@@ -141,13 +156,13 @@ if __name__ == '__main__':
                 # 将所有文件名存储到一个文件中，方便以后使用
                 filenames_file.writelines(filename+'\n')
                 if int(i / n) % 1000 == 0:
-                    print('{t} *** {i} \t docs has been dealed'
+                    print('{t} *** {i} \t docs has  been dealed'
                           .format(i=i, t=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())))
         filenames_file.close()
 
         print("去掉出现次数过多或过少的词前，字典长度为：" + str(len(dictionary)))
         # 去掉词典中出现次数过少或过多的
-        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 15]
+        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 80]
         dictionary.filter_tokens(small_freq_ids)
         dictionary.compactify()
         dictionary.save(path_dictionary)
@@ -285,11 +300,12 @@ if __name__ == '__main__':
     t4 = time.time()
     print("第四阶段用时：%d" % (t4-t3))
 
-    # gamma = lda_model.do_estep(corpus)
-    # lda_model.update_alpha(gamma, 0.7)
-    # ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
-    # # lda_model.optimize_eta = True
-    # lda_model.do_mstep(rho=0.7, other=ldaState)
+    gamma = lda_model.do_estep(corpus)
+    lda_model.update_alpha(gamma, 0.7)
+    ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
+    # lda_model.optimize_eta = True
+    lda_model.do_mstep(rho=0.7, other=ldaState)
+
     topic = lda_model.show_topics(n_topic, 5)
     print(topic)
 
@@ -316,6 +332,7 @@ if __name__ == '__main__':
     # ff = open('similarity','w',encoding='utf-8')
     graph = nx.Graph()
     doc_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus, num_features=len(dictionary))
+    # doc_index = similarities.MatrixSimilarity(lda_model[corpus])
     for i, similars in zip(range(len(filenames)), doc_index):
         fileTopicI = lda_model.get_document_topics(corpus[i], minimum_phi_value=0.02)
         fileTopicI.sort(key=lambda x: x[1], reverse=True)
