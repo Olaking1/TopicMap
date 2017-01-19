@@ -12,6 +12,9 @@ import jieba.posseg
 import pickle as pkl
 import networkx as nx
 import matplotlib.pyplot as plt
+from pylab import mpl
+mpl.rcParams['font.sans-serif'] = ['SimHei']  # 指定默认字体
+mpl.rcParams['axes.unicode_minus'] = False  # 解决保存图像是负号'-'显示为方块的问题
 
 # logging.basicConfig(level=logging.WARNING,
 #                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
@@ -91,19 +94,8 @@ def get_stop_words(path='stop_words'):
 
 def accuracy(filenames, fileTopicList): # 计算分类的正确性
     count = 0
-    # docfre＝40 accuracy=57.21%
-    # docsTopic = ['linux','hbase','mysql','docker','mongodb','zookeeper','mysql','hadoop']
-    # docfre ＝ 50 accrucy＝59.24%
-    # docsTopic = ['mybatis','linux','mongodb','docker','zookeeper','mysql','hbase','hadoop']
-    # docfre = 60 accuray=60.77%
-    # docsTopic = ['mybatis','docker','mongodb','hbase','mysql','hadoop','linux','zookeeper']
     # docfre = 70 accuray=66.81%
     docsTopic = ['mongodb','zookeeper','hadoop','linux','hbase','docker','mybatis','mysql']
-    # docfre = 80 accuray=52.47%
-    # docsTopic = ['mybatis', 'linux', 'docker', 'mysql', 'zookeeper', 'hadoop', 'hbase', 'mongodb']
-    # docfre = 90 accuray=52.47%
-    # docsTopic = ['zookeeper','linux','mongodb','hbase','docker','zookeeper','hadoop','mysql']
-    # docsTopic = ['hadoop','mybatis','mongodb','linux','mysql','hbase','zookeeper','mybatis']
     for i in range(len(filenames)):
         try:
             if filenames[i].lower().__contains__(docsTopic[fileTopicList[i][0]]):
@@ -114,7 +106,7 @@ def accuracy(filenames, fileTopicList): # 计算分类的正确性
 
 
 if __name__ == '__main__':
-    path_doc_root = '../datasets/traindatas'  # 根目录 即存放按类分类好的文本集
+    path_doc_root = '../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
     path_tmp = '../datasets/csdn_tmp'  # 存放中间结果的位置
     path_dictionary = os.path.join(path_tmp, 'THUNews.dict')
     path_tmp_corpus = os.path.join(path_tmp, 'corpus')
@@ -165,7 +157,7 @@ if __name__ == '__main__':
 
         print("去掉出现次数过多或过少的词前，字典长度为：" + str(len(dictionary)))
         # 去掉词典中出现次数过少或过多的
-        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 70]
+        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 30]
         dictionary.filter_tokens(small_freq_ids)
         dictionary.compactify()
         dictionary.save(path_dictionary)
@@ -345,130 +337,40 @@ if __name__ == '__main__':
     #
     # accuracy = accuracy(filenames, fileTopicList)
     # print(accuracy)
-    # print("Log perplexity of the model is", lda_model.log_perplexity(corpus))
 
     # # ===================================================================
     # # # # 第七阶段，  画出主题地图，并计算各网络的相关参数
-    graph = nx.Graph()
-    doc_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus, num_features=len(dictionary))
-    # doc_index = similarities.MatrixSimilarity(lda_model[corpus])
-    for i, similars in zip(range(len(filenames)), doc_index):
-        fileTopicI = lda_model.get_document_topics(corpus[i], minimum_phi_value=0.02)
-        fileTopicI.sort(key=lambda x: x[1], reverse=True)
-        for j in range(len(similars)):
-            if(similars[j] >0.75 and similars[j] < 0.99):
-                graph.add_node(i, topic=fileTopicI[0][0])
-                graph.add_edge(i,j, weight=similars[j])
+    if not os.path.exists(path_temp_topicmaps):
+        graph = nx.Graph()
+        doc_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus, num_features=len(dictionary))
+        for i, similars in zip(range(len(filenames)), doc_index):
+            fileTopicI = lda_model.get_document_topics(corpus[i], minimum_phi_value=0.02)
+            fileTopicI.sort(key=lambda x: x[1], reverse=True)
+            for j in range(len(similars)):
+                if(similars[j] >0.70 and similars[j] < 0.99):
+                    graph.add_node(i, topic=fileTopicI[0][0])
+                    graph.add_edge(i,j, weight=similars[j])
 
-    graph.add_edge(1317, 1368, weight=0.80)
-    graph.add_edge(531, 1357, weight=0.80)
-    graph.add_edge(661, 1310, weight=0.80)
-    graph.add_edge(682, 1281, weight=0.80)
-    graph.add_edge(616, 1270, weight=0.80)
-    graph.add_edge(1211, 1187, weight=0.80)
-    graph.add_edge(1125, 1124, weight=0.80)
-    graph.add_edge(551, 672, weight=0.80)
-    graph.add_edge(550, 634, weight=0.80)
-    graph.add_edge(1044, 632, weight=0.80)
-    graph.add_edge(666, 693, weight=0.80)
-    graph.add_edge(1151, 325, weight=0.80)
-    graph.add_edge(836, 85, weight=0.80)
-    graph.add_edge(954, 933, weight=0.80)
-    graph.add_edge(993, 1006, weight=0.80)
-    graph.add_edge(106, 1221, weight=0.80)
-    graph.add_edge(1220, 1141, weight=0.80)
-    graph.add_edge(1060, 691, weight=0.80)
-    graph.add_edge(1059, 619, weight=0.80)
-    graph.add_edge(1059, 671, weight=0.80)
-    graph.add_edge(397, 705, weight=0.80)
-    graph.add_edge(397, 671, weight=0.80)
-    graph.add_edge(397, 634, weight=0.80)
-    graph.add_edge(1115, 1153, weight=0.80)
-    graph.add_edge(1072, 1209, weight=0.80)
-    graph.add_edge(1246, 1194, weight=0.80)
-    graph.add_edge(1248, 1202, weight=0.80)
-    graph.add_edge(987, 1043, weight=0.80)
-    graph.add_edge(959, 909, weight=0.80)
-    graph.add_edge(963, 967, weight=0.80)
-    graph.add_edge(531, 1300, weight=0.80)
-    graph.add_edge(531, 1304, weight=0.80)
-    graph.add_edge(627, 1325, weight=0.80)
-    graph.add_edge(627, 1302, weight=0.80)
-    graph.add_edge(685, 1302, weight=0.80)
-    graph.add_edge(569, 1302, weight=0.80)
-    graph.add_edge(665, 1304, weight=0.80)
-    graph.add_edge(665, 1300, weight=0.80)
-    graph.add_edge(1317, 1304, weight=0.80)
-    graph.add_edge(1317, 1300, weight=0.80)
-    graph.add_edge(264, 238, weight=0.80)
-    graph.add_edge(603, 596, weight=0.80)
-    graph.add_edge(1304, 697, weight=0.80)
-    graph.add_edge(1302, 697, weight=0.80)
-    graph.add_edge(1324, 591, weight=0.80)
-    graph.add_edge(1357, 638, weight=0.80)
-    graph.add_edge(1357, 639, weight=0.80)
-    graph.add_edge(1357, 630, weight=0.80)
-    graph.add_edge(1341, 697, weight=0.80)
-    graph.add_edge(1339, 591, weight=0.80)
-    graph.add_edge(1300, 696, weight=0.80)
-    graph.add_edge(631, 1304, weight=0.80)
-    graph.add_edge(528, 1304, weight=0.80)
-    graph.add_edge(528, 1320, weight=0.80)
-    graph.add_edge(631, 1302, weight=0.80)
-    graph.add_edge(531, 1302, weight=0.80)
-    graph.add_edge(531, 1320, weight=0.80)
-    graph.add_edge(591, 1302, weight=0.80)
-    graph.add_edge(591, 1304, weight=0.80)
-    graph.add_edge(682, 1304, weight=0.80)
-    graph.add_edge(682, 1320, weight=0.80)
-    graph.add_edge(538, 1320, weight=0.80)
-    graph.add_edge(538, 1304, weight=0.80)
-    graph.add_edge(1302, 627, weight=0.80)
-    graph.add_edge(1345, 595, weight=0.80)
-    graph.add_edge(1324, 527, weight=0.80)
-    graph.add_edge(1328, 692, weight=0.80)
-    graph.add_edge(1319, 624, weight=0.80)
-    graph.add_edge(692, 687, weight=0.80)
-    graph.add_edge(617, 686, weight=0.80)
-    graph.add_edge(1267, 1342, weight=0.80)
-    graph.add_edge(1301, 1342, weight=0.80)
-    graph.add_edge(1366, 1352, weight=0.80)
-    graph.add_edge(1292, 1344, weight=0.80)
-    graph.add_edge(571, 717, weight=0.80)
-    graph.add_edge(552, 715, weight=0.80)
-    graph.add_edge(642, 540, weight=0.80)
-    graph.add_edge(549, 555, weight=0.80)
-    graph.add_edge(657, 619, weight=0.80)
-    graph.add_edge(1005, 362, weight=0.80)
-    graph.add_edge(987, 322, weight=0.80)
-    graph.add_edge(1081, 950, weight=0.80)
-    graph.add_edge(362, 1005, weight=0.80)
-    graph.add_edge(659, 1320, weight=0.80)
-    graph.add_edge(669, 1324, weight=0.80)
-    graph.add_edge(609, 538, weight=0.80)
-    graph.add_edge(607, 697, weight=0.80)
-    graph.add_edge(614, 627, weight=0.80)
-
-    rem_node = [664,256,220,207,749,890,834,783,746,706,572,529,835,756,837,
-                209,337,1264,1268,863,660,601,752,744,736,763,870,807,795,796,
-                154,294,312,483,498,297,155,466,836,485,955,1035,754,748,733,
-                654,658,565,537,703,637,1263,393,82,60,90,57,523,467,1171,1172,
-                688,582,732,889,1068,1237,1066,1204,1064,1103,1095,1097,1098,709]
-    graph.remove_nodes_from(rem_node)
+        nx.write_gml(graph, path_temp_topicmaps, stringizer=str)
+    else:
+        graph = nx.read_gml(path_temp_topicmaps, destringizer=float)
 
     topic_map_cluster = nx.average_clustering(graph)
     print("平均路径长度为：%f" % nx.average_shortest_path_length(graph))
 
     degree_dict = nx.degree(graph)
+    degree_dict = sorted(degree_dict.items(), key=lambda d:d[1], reverse=True)
     degree_distr = {}
+    higher_degree_nodes = []
     count = 0
-    for key, value in degree_dict.items():
+    for key, value in degree_dict:
         count = count + value
         if value in degree_distr:
             degree_distr[value] +=1
         else:
             degree_distr[value] = 1
-    print(degree_distr)
+        if value>=60:
+            higher_degree_nodes.append(key)
     average_degree = count / len(nx.nodes(graph))
 
     print("主题地图平均度数：%f" % average_degree)
@@ -483,47 +385,66 @@ if __name__ == '__main__':
     ER_graph_cluster = nx.average_clustering(ER_graph)
     ER_graph_path = nx.average_shortest_path_length(ER_graph)
 
-   # WS_graph = nx.random_graphs.watts_strogatz_graph(len(nx.nodes(graph)), int(average_degree), 0.0158)
     WS_graph = nx.random_graphs.watts_strogatz_graph(len(nx.nodes(graph)), int(average_degree)*2, 0.0158)
     WS_graph_cluster = nx.average_clustering(WS_graph)
     WS_graph_path = nx.average_shortest_path_length(WS_graph)
 
     width = 1
-    ind = np.linspace(2, 9.5, 4)
+    ind = np.linspace(1, 9, 4)
     Y1 = [regular_graph_cluster,ER_graph_cluster,WS_graph_cluster,topic_map_cluster]
     Y2 = [regular_graph_path, ER_graph_path, WS_graph_path, topicmap_path]
-    labels = ['规则网络','随机网络','小世界网络','主题地图']
-    fig = plt.figure(3)
-    ax1 = fig.add_subplot(221)
+    labels = ['regular','random','small world','topic map']
+    fig1 = plt.figure(1, dpi=250)
+    ax1 = fig1.add_subplot(121)
     ax1.bar(ind-width/2,Y1,width)
     ax1.set_xticks(ind)
-    ax1.set_ylabel('网络平均聚集度')
-    ax1.set_xticklabels(labels, fontsize='small')
-    ax1.set_title('各网络的平均聚集度比较')
-    ax2 = fig.add_subplot(222)
+    ax1.set_ylabel('Clustering coefficient')
+    ax1.set_xticklabels(labels, fontsize='medium', rotation=15)
+    ax2 = fig1.add_subplot(122)
     ax2.bar(ind - width / 2, Y2, width)
     ax2.set_xticks(ind)
-    ax2.set_ylabel('网络平均最短路径')
-    ax2.set_xticklabels(labels, fontsize='small')
-    ax2.set_title('各网络的平均最短路径比较')
-    ax3 = fig.add_subplot(223)
-    X3 = list(degree_distr.keys())
-    Y3 = scipy.log10(list(degree_distr.values()))
-    ax3.scatter(X3, Y3, marker='o')
-    ax3.set_title('主题地图度的幂分布')
-    # ax3.plot(X3, -1.25*X3)
-    ax3.set_xlim(1, 100)
-    plt.subplots_adjust(left=0.08, bottom=0.08, right=0.98, top=0.90)
-    plt.show()
+    ax2.set_ylabel('average shortest path length')
+    ax2.set_ylim(0,10)
+    ax2.set_xticklabels(labels, fontsize='medium', rotation=15)
+    plt.subplots_adjust(left=0.08, bottom=0.30, right=0.98, top=0.70)
+    fig1.savefig('compare with networkx.eps')
+    fig1.savefig('compare with networkx.jpeg')
 
-    # pos = nx.spring_layout(graph, iterations=200)
-    # elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >=0.90]
-    # esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] <0.90]
-    # nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
-    # nx.draw_networkx_nodes(graph, pos, node_color=nodeColor, node_size=300)
-    # # nx.draw_networkx_nodes(graph, pos, node_size=300)
-    # nx.draw_networkx_edges(graph, pos, edgelist=elarge, width=1)
-    # nx.draw_networkx_edges(graph, pos, edgelist=esmall, width=1)
-    # # nx.draw_networkx_labels(graph, pos, font_size=10, font_family='sans-serif')
-    # plt.subplots_adjust(left=0.08, bottom=0.08, right=0.98, top=0.90)
-    # plt.show()
+    fig2 = plt.figure(2, dpi=250)
+    ax3 = fig2.add_subplot(111)
+    X3 = np.array(list(degree_distr.keys()))
+    Y3 = list(degree_distr.values())
+    Y3_2 = 250*scipy.power(X3, -1.5)
+    ax3.scatter(X3, Y3, marker='o', label='Degree distribution')
+    ax3.set_title('Degree distributions of the topic map')
+    ax3.plot(X3, Y3_2, linewidth=3, color='r', markeredgewidth=0.5, label='$P(k)=\\alpha*k^{-\\beta}$')
+    ax3.set_xlim(0, 100)
+    ax3.set_ylim(-20, 100)
+    plt.legend()
+    fig2.savefig('degree distribution.eps')
+    fig2.savefig('degree distribution.jpeg')
+
+    fig3 = plt.figure(3)
+    ax4 = fig3.add_subplot(111)
+    pos = nx.spring_layout(graph, iterations=600)
+    elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >=0.90]
+    esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] <0.90]
+    nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
+    nx.draw_networkx_nodes(graph, pos, node_color=nodeColor, node_size=300)
+    nx.draw_networkx_edges(graph, pos, edgelist=elarge, width=1)
+    nx.draw_networkx_edges(graph, pos, edgelist=esmall, width=1)
+    nx.draw_networkx_labels(graph, pos, font_size=10, font_family='sans-serif')
+    higher_degree_graph = nx.Graph()
+    higher_degree_graph.add_nodes_from(higher_degree_nodes)
+    nx.draw_networkx_nodes(higher_degree_graph, pos, node_shape='s', node_size=250, node_color='g')
+    nx.draw_networkx_labels(higher_degree_graph, pos, font_size=10, font_family='sans-serif')
+    ax4.set_xticks([])
+    ax4.set_yticks([])
+    ax4.spines['right'].set_color('none')
+    ax4.spines['top'].set_color('none')
+    ax4.spines['bottom'].set_color('none')
+    ax4.spines['left'].set_color('none')
+    plt.title('Topic map of eight topic')
+    fig3.savefig('topic map.eps')
+    fig3.savefig('topic map.jpeg')
+    plt.show()
