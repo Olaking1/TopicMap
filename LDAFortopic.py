@@ -13,6 +13,7 @@ import pickle as pkl
 import networkx as nx
 import matplotlib.pyplot as plt
 from pylab import mpl
+import network_extension as ne
 mpl.rcParams['font.sans-serif'] = ['SimHei']  # 指定默认字体
 mpl.rcParams['axes.unicode_minus'] = False  # 解决保存图像是负号'-'显示为方块的问题
 
@@ -103,6 +104,122 @@ def accuracy(filenames, fileTopicList): # 计算分类的正确性
         except Exception:
             print(i)
     return count/len(filenames)
+
+
+def path_compare():
+    global degree_distr, higher_degree_nodes
+    topic_map_cluster = nx.average_clustering(graph)
+    print("平均路径长度为：%f" % nx.average_shortest_path_length(graph))
+    average_degree = graph_average_degree()
+    print("主题地图平均度数：%f" % average_degree)
+    print("主题地图的结点总数:%d" % len(nx.nodes(graph)))
+    topicmap_path = nx.average_shortest_path_length(graph)
+    regular_graph = nx.random_graphs.random_regular_graph(int(average_degree), len(nx.nodes(graph)))
+    regular_graph_cluster = nx.average_clustering(regular_graph)
+    regular_graph_path = nx.average_shortest_path_length(regular_graph)
+    ER_graph = nx.random_graphs.erdos_renyi_graph(len(nx.nodes(graph)), 0.0079)
+    ER_graph_cluster = nx.average_clustering(ER_graph)
+    ER_graph_path = nx.average_shortest_path_length(ER_graph)
+    WS_graph = nx.random_graphs.watts_strogatz_graph(len(nx.nodes(graph)), int(average_degree) * 2, 0.0158)
+    WS_graph_cluster = nx.average_clustering(WS_graph)
+    WS_graph_path = nx.average_shortest_path_length(WS_graph)
+    width = 1
+    ind = np.linspace(1, 9, 4)
+    Y1 = [regular_graph_cluster, ER_graph_cluster, WS_graph_cluster, topic_map_cluster]
+    Y2 = [regular_graph_path, ER_graph_path, WS_graph_path, topicmap_path]
+    labels = ['regular', 'random', 'small world', 'topic map']
+    fig1 = plt.figure(1, dpi=250)
+    ax1 = fig1.add_subplot(121)
+    ax1.bar(ind - width / 2, Y1, width)
+    ax1.set_xticks(ind)
+    ax1.set_ylabel('Clustering coefficient')
+    ax1.set_xticklabels(labels, fontsize='medium', rotation=15)
+    ax2 = fig1.add_subplot(122)
+    ax2.bar(ind - width / 2, Y2, width)
+    ax2.set_xticks(ind)
+    ax2.set_ylabel('average shortest path length')
+    ax2.set_ylim(0, 10)
+    ax2.set_xticklabels(labels, fontsize='medium', rotation=15)
+    plt.subplots_adjust(left=0.08, bottom=0.30, right=0.98, top=0.70)
+    fig1.savefig('compare with networkx.eps')
+    fig1.savefig('compare with networkx.jpeg')
+
+
+def graph_average_degree():
+    global degree_distr, higher_degree_nodes
+    degree_dict = nx.degree(graph)
+    degree_dict = sorted(degree_dict.items(), key=lambda d: d[1], reverse=True)
+    degree_distr = {}
+    higher_degree_nodes = []
+    count = 0
+    for key, value in degree_dict:
+        count = count + value
+        if value in degree_distr:
+            degree_distr[value] += 1
+        else:
+            degree_distr[value] = 1
+        if value >= 60:
+            higher_degree_nodes.append(key)
+            print("key %d, value %d" %(key, value))
+    average_degree = count / len(nx.nodes(graph))
+    return average_degree
+
+
+def degree_distribution():
+    fig2 = plt.figure(2, dpi=250)
+    ax3 = fig2.add_subplot(111)
+    X3 = np.array(list(degree_distr.keys()))
+    Y3 = list(degree_distr.values())
+    Y3_2 = 250 * scipy.power(X3, -1.5)
+    ax3.scatter(X3, Y3, marker='o', label='Degree distribution')
+    ax3.set_title('Degree distributions of the topic map')
+    ax3.plot(X3, Y3_2, linewidth=3, color='r', markeredgewidth=0.5, label='$P(k)=\\alpha*k^{-\\beta}$')
+    ax3.set_xlim(0, 100)
+    ax3.set_ylim(-20, 100)
+    plt.legend()
+    fig2.savefig('degree distribution.eps')
+    fig2.savefig('degree distribution.jpeg')
+
+
+def topicmap_draw():
+    fig3 = plt.figure(3)
+    ax4 = fig3.add_subplot(111)
+    pos = nx.spring_layout(graph, iterations=600)
+    elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >= 0.90]
+    esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] < 0.90]
+    nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
+    nx.draw_networkx_nodes(graph, pos, node_color=nodeColor, node_size=300)
+    nx.draw_networkx_edges(graph, pos, edgelist=elarge, width=1)
+    nx.draw_networkx_edges(graph, pos, edgelist=esmall, width=1)
+    nx.draw_networkx_labels(graph, pos, font_size=10, font_family='sans-serif')
+    higher_degree_graph = nx.Graph()
+    higher_degree_graph.add_nodes_from(higher_degree_nodes)
+    nx.draw_networkx_nodes(higher_degree_graph, pos, node_shape='s', node_size=250, node_color='g')
+    nx.draw_networkx_labels(higher_degree_graph, pos, font_size=10, font_family='sans-serif')
+    ax4.set_xticks([])
+    ax4.set_yticks([])
+    ax4.spines['right'].set_color('none')
+    ax4.spines['top'].set_color('none')
+    ax4.spines['bottom'].set_color('none')
+    ax4.spines['left'].set_color('none')
+    plt.title('Topic map of eight topic')
+    fig3.savefig('topic map.eps')
+    fig3.savefig('topic map.jpeg')
+
+def effeciency_compute():
+    fig4 = plt.figure(4)
+    ax5 = fig4.add_subplot(111)
+    effeciency_list=[]
+    effeciency_list.append(ne.network_efficiency(graph))
+    for node in higher_degree_nodes:
+        graph.remove_node(node)
+        eff= ne.network_efficiency(graph)
+        effeciency_list.append(eff)
+        print("剩余节点个数:%d, node:%d, effeciency:%f" %(graph.number_of_nodes(), node, eff))
+    ax5.scatter(range(len(higher_degree_nodes)+1), effeciency_list, marker='x', linewidth=3)
+    plt.title('network efficiency')
+    fig4.savefig('network efficiency.eps')
+    fig4.savefig('network efficiency.jpeg')
 
 
 if __name__ == '__main__':
@@ -355,96 +472,8 @@ if __name__ == '__main__':
     else:
         graph = nx.read_gml(path_temp_topicmaps, destringizer=float)
 
-    topic_map_cluster = nx.average_clustering(graph)
-    print("平均路径长度为：%f" % nx.average_shortest_path_length(graph))
-
-    degree_dict = nx.degree(graph)
-    degree_dict = sorted(degree_dict.items(), key=lambda d:d[1], reverse=True)
-    degree_distr = {}
-    higher_degree_nodes = []
-    count = 0
-    for key, value in degree_dict:
-        count = count + value
-        if value in degree_distr:
-            degree_distr[value] +=1
-        else:
-            degree_distr[value] = 1
-        if value>=60:
-            higher_degree_nodes.append(key)
-    average_degree = count / len(nx.nodes(graph))
-
-    print("主题地图平均度数：%f" % average_degree)
-    print("主题地图的结点总数:%d" % len(nx.nodes(graph)))
-    topicmap_path = nx.average_shortest_path_length(graph)
-
-    regular_graph = nx.random_graphs.random_regular_graph(int(average_degree), len(nx.nodes(graph)))
-    regular_graph_cluster = nx.average_clustering(regular_graph)
-    regular_graph_path = nx.average_shortest_path_length(regular_graph)
-
-    ER_graph = nx.random_graphs.erdos_renyi_graph(len(nx.nodes(graph)), 0.0079)
-    ER_graph_cluster = nx.average_clustering(ER_graph)
-    ER_graph_path = nx.average_shortest_path_length(ER_graph)
-
-    WS_graph = nx.random_graphs.watts_strogatz_graph(len(nx.nodes(graph)), int(average_degree)*2, 0.0158)
-    WS_graph_cluster = nx.average_clustering(WS_graph)
-    WS_graph_path = nx.average_shortest_path_length(WS_graph)
-
-    width = 1
-    ind = np.linspace(1, 9, 4)
-    Y1 = [regular_graph_cluster,ER_graph_cluster,WS_graph_cluster,topic_map_cluster]
-    Y2 = [regular_graph_path, ER_graph_path, WS_graph_path, topicmap_path]
-    labels = ['regular','random','small world','topic map']
-    fig1 = plt.figure(1, dpi=250)
-    ax1 = fig1.add_subplot(121)
-    ax1.bar(ind-width/2,Y1,width)
-    ax1.set_xticks(ind)
-    ax1.set_ylabel('Clustering coefficient')
-    ax1.set_xticklabels(labels, fontsize='medium', rotation=15)
-    ax2 = fig1.add_subplot(122)
-    ax2.bar(ind - width / 2, Y2, width)
-    ax2.set_xticks(ind)
-    ax2.set_ylabel('average shortest path length')
-    ax2.set_ylim(0,10)
-    ax2.set_xticklabels(labels, fontsize='medium', rotation=15)
-    plt.subplots_adjust(left=0.08, bottom=0.30, right=0.98, top=0.70)
-    fig1.savefig('compare with networkx.eps')
-    fig1.savefig('compare with networkx.jpeg')
-
-    fig2 = plt.figure(2, dpi=250)
-    ax3 = fig2.add_subplot(111)
-    X3 = np.array(list(degree_distr.keys()))
-    Y3 = list(degree_distr.values())
-    Y3_2 = 250*scipy.power(X3, -1.5)
-    ax3.scatter(X3, Y3, marker='o', label='Degree distribution')
-    ax3.set_title('Degree distributions of the topic map')
-    ax3.plot(X3, Y3_2, linewidth=3, color='r', markeredgewidth=0.5, label='$P(k)=\\alpha*k^{-\\beta}$')
-    ax3.set_xlim(0, 100)
-    ax3.set_ylim(-20, 100)
-    plt.legend()
-    fig2.savefig('degree distribution.eps')
-    fig2.savefig('degree distribution.jpeg')
-
-    fig3 = plt.figure(3)
-    ax4 = fig3.add_subplot(111)
-    pos = nx.spring_layout(graph, iterations=600)
-    elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >=0.90]
-    esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] <0.90]
-    nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
-    nx.draw_networkx_nodes(graph, pos, node_color=nodeColor, node_size=300)
-    nx.draw_networkx_edges(graph, pos, edgelist=elarge, width=1)
-    nx.draw_networkx_edges(graph, pos, edgelist=esmall, width=1)
-    nx.draw_networkx_labels(graph, pos, font_size=10, font_family='sans-serif')
-    higher_degree_graph = nx.Graph()
-    higher_degree_graph.add_nodes_from(higher_degree_nodes)
-    nx.draw_networkx_nodes(higher_degree_graph, pos, node_shape='s', node_size=250, node_color='g')
-    nx.draw_networkx_labels(higher_degree_graph, pos, font_size=10, font_family='sans-serif')
-    ax4.set_xticks([])
-    ax4.set_yticks([])
-    ax4.spines['right'].set_color('none')
-    ax4.spines['top'].set_color('none')
-    ax4.spines['bottom'].set_color('none')
-    ax4.spines['left'].set_color('none')
-    plt.title('Topic map of eight topic')
-    fig3.savefig('topic map.eps')
-    fig3.savefig('topic map.jpeg')
+    path_compare()
+    # degree_distribution()
+    # topicmap_draw()
+    effeciency_compute()
     plt.show()
