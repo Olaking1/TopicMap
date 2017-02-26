@@ -1,6 +1,6 @@
 import networkx as nx
 
-def network_efficiency(G, n):
+def network_efficiency(G):
     """Computes the efficiency of ``G``.
 
         Parameters

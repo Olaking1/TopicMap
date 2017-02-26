@@ -274,7 +274,7 @@ if __name__ == '__main__':
 
         print("去掉出现次数过多或过少的词前，字典长度为：" + str(len(dictionary)))
         # 去掉词典中出现次数过少或过多的
-        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 30]
+        small_freq_ids = [tokenid for tokenid, docfreq in dictionary.dfs.items() if docfreq < 70]
         dictionary.filter_tokens(small_freq_ids)
         dictionary.compactify()
         dictionary.save(path_dictionary)
@@ -295,19 +295,15 @@ if __name__ == '__main__':
         os.makedirs(path_tmp_tfidf)
         files = loadFiles(path_doc_root)
         tfidf_model = models.TfidfModel(dictionary=dictionary)
-        corpus_tfidf = {}
+        corpus_tfidf = []
         for i, msg in enumerate(files):
             if i % n == 0:
-                catg = msg[0]
                 content = msg[1]
                 word_list = convert_doc_to_wordlist(content, cut_all=False)
                 file_bow = dictionary.doc2bow(word_list)
                 corpus.append(file_bow)
                 file_tfidf = tfidf_model[file_bow]
-                tmp = corpus_tfidf.get(catg, [])
-                tmp.append(file_tfidf)
-                if tmp.__len__() == 1:
-                    corpus_tfidf[catg] = tmp
+                corpus_tfidf.append(file_tfidf)
             if i % 10000 == 0:
                 print('{i} files is dealed'.format(i=i))
         # 将corpus中间结果存储起来
@@ -315,13 +311,11 @@ if __name__ == '__main__':
         corpora.MmCorpus.serialize('{f}{s}{c}.mm'.format(f=path_tmp_corpus, s=os.sep, c='corpus'), corpus,
                                    id2word=dictionary)
         # 将tfidf中间结果储存起来
-        catgs = list(corpus_tfidf.keys())
-        for catg in catgs:
-            corpora.MmCorpus.serialize('{f}{s}{c}.mm'.format(f=path_tmp_tfidf, s=os.sep, c=catg),
-                                       corpus_tfidf.get(catg),
-                                       id2word=dictionary
-                                       )
-            print('catg {c} has been transformed into tfidf vector'.format(c=catg))
+        corpora.MmCorpus.serialize('{f}{s}{c}.mm'.format(f=path_tmp_tfidf, s=os.sep, c='tf-idf'),
+                                   corpus_tfidf,
+                                   id2word=dictionary
+                                   )
+        print('document has been transformed into tfidf vector')
         print('=== tfidf向量已经生成 ===')
     else:
         print('=== 检测到tfidf向量已经生成，跳过该阶段 ===')
@@ -336,48 +330,31 @@ if __name__ == '__main__':
             dictionary = corpora.Dictionary.load(path_dictionary)
         if not corpus_tfidf:  # 如果跳过了第二阶段，则从指定位置读取tfidf文档
             print('--- 未检测到tfidf文档，开始从磁盘中读取 ---')
-            # 从对应文件夹中读取所有类别
-            files = os.listdir(path_tmp_tfidf)
-            catg_list = []
-            for content in files:
-                t = content.split('.')[0]
-                if t not in catg_list:
-                    catg_list.append(t)
 
             # 从磁盘中读取corpus
-            corpus_tfidf = {}
-            for catg in catg_list:
-                path = '{f}{s}{c}.mm'.format(f=path_tmp_tfidf, s=os.sep, c=catg)
-                tfidfCorpus = corpora.MmCorpus(path)
-                corpus_tfidf[catg] = tfidfCorpus
+            path = '{f}{s}{c}.mm'.format(f=path_tmp_tfidf, s=os.sep, c='tf-idf')
+            corpus_tfidf = corpora.MmCorpus(path)
             print('--- tfidf文档读取完毕，开始转化成lda向量 ---')
 
         # 生成lda model
         os.makedirs(path_tmp_lda)
-        corpus_tfidf_total = []
-        catgs = list(corpus_tfidf.keys())
-        for catg in catgs:
-            tmp = corpus_tfidf.get(catg)
-            corpus_tfidf_total += tmp
-        lda_model = models.LdaModel(corpus=corpus_tfidf_total, id2word=dictionary, num_topics=n_topic, alpha=0.1,
+        lda_model = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=n_topic, alpha=0.1,
                                     eval_every=1, iterations=100)
 
         # 将lda模型存储到磁盘上
         lda_file = open(path_tmp_ldamodel, 'wb')
         pkl.dump(lda_model, lda_file)
         lda_file.close()
-        del corpus_tfidf_total  # lda model已经生成，释放变量空间
         print('--- lda模型已经生成 ---')
 
         # 生成corpus of lda, 并逐步去掉 corpus of tfidf
-        corpus_lda = {}
-        for catg in catgs:
-            corpu = [lda_model[doc] for doc in corpus_tfidf.get(catg)]
-            corpus_lda[catg] = corpu
-            corpus_tfidf.pop(catg)
-            corpora.MmCorpus.serialize('{f}{s}{c}.mm'.format(f=path_tmp_lda, s=os.sep, c=catg),
-                                       corpu,
-                                       id2word=dictionary)
+        corpus_lda = []
+        corpu = [lda_model[doc] for doc in corpus_tfidf]
+        for item in corpu:
+            corpus_lda.append(item)
+        corpora.MmCorpus.serialize('{f}{s}{c}.mm'.format(f=path_tmp_lda, s=os.sep, c='corpus_lda'),
+                                   corpu,
+                                   id2word=dictionary)
         print('=== lda向量已经生成 ===')
     else:
         print('=== 检测到lda向量已经生成，跳过该阶段 ===')
@@ -388,32 +365,26 @@ if __name__ == '__main__':
     # # # # 第四阶段，   读取存在本地的lda模型
     if not corpus_lda:  # 如果跳过了第三阶段
         print('--- 未检测到lda文档，开始从磁盘中读取 ---')
-        files = os.listdir(path_tmp_lda)
-        catg_list = []
-        for content in files:
-            t = content.split('.')[0]
-            if t not in catg_list:
-                catg_list.append(t)
         # 从磁盘中读取corpus
         path = '{f}{s}{c}.mm'.format(f=path_tmp_corpus, s=os.sep, c='corpus')
         corpus = corpora.MmCorpus(path)
         # 从磁盘中读取corpus_lda
-        corpus_lda = {}
-        for catg in catg_list:
-            path = '{f}{s}{c}.mm'.format(f=path_tmp_lda, s=os.sep, c=catg)
-            Mmcorpus = corpora.MmCorpus(path)
-            corpus_lda[catg] = Mmcorpus
+        corpus_lda = []
+        path = '{f}{s}{c}.mm'.format(f=path_tmp_lda, s=os.sep, c='corpus_lda')
+        Mmcorpus = corpora.MmCorpus(path)
+        corpus_lda.append(Mmcorpus)
         # 从磁盘中读取dictionary
         dictionary = corpora.Dictionary.load(path_dictionary)
         # 从磁盘中读取lda_model
         lda_file = open(path_tmp_ldamodel, "rb")
         lda_model = pkl.load(lda_file, encoding="utf-8")
         print('--- lda文档读取完毕，开始进行分类 ---')
+
     t4 = time.time()
     print("第四阶段用时：%d" % (t4-t3))
 
-    gamma = lda_model.do_estep(corpus)
-    lda_model.update_alpha(gamma, 0.7)
+    # gamma = lda_model.do_estep(corpus)
+    # lda_model.update_alpha(gamma, 0.7)
     ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
     # lda_model.optimize_eta = True
     lda_model.do_mstep(rho=0.7, other=ldaState)
@@ -426,7 +397,7 @@ if __name__ == '__main__':
     topn = 300
     topic_term = []
     for i in range(n_topic):
-        topic_term_pro = lda_model.get_topic_terms(i, topn=topn)
+        topic_term_pro = lda_model.get_topic_terms(i, topn=topn*50)
         topic_term = [(id, pro) for (id, pro) in topic_term_pro]
         corpus_topic.append(topic_term)
     topic_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus_topic,
@@ -459,12 +430,12 @@ if __name__ == '__main__':
     # # # # 第七阶段，  画出主题地图，并计算各网络的相关参数
     if not os.path.exists(path_temp_topicmaps):
         graph = nx.Graph()
-        doc_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus, num_features=len(dictionary))
+        doc_index = similarities.MatrixSimilarity(corpus=corpus_lda, num_features=len(dictionary))
         for i, similars in zip(range(len(filenames)), doc_index):
             fileTopicI = lda_model.get_document_topics(corpus[i], minimum_phi_value=0.02)
             fileTopicI.sort(key=lambda x: x[1], reverse=True)
             for j in range(len(similars)):
-                if(similars[j] >0.70 and similars[j] < 0.99):
+                if(similars[j] >0.80 and similars[j] < 0.99):
                     graph.add_node(i, topic=fileTopicI[0][0])
                     graph.add_edge(i,j, weight=similars[j])
 
@@ -473,7 +444,7 @@ if __name__ == '__main__':
         graph = nx.read_gml(path_temp_topicmaps, destringizer=float)
 
     path_compare()
-    # degree_distribution()
-    # topicmap_draw()
+    degree_distribution()
+    topicmap_draw()
     effeciency_compute()
     plt.show()
