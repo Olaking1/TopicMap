@@ -2,6 +2,7 @@
 import gensim
 from gensim import corpora, models, similarities
 from sklearn.cluster import KMeans
+from sklearn import svm
 from scipy.sparse import csr_matrix
 import numpy as np
 import scipy
@@ -49,12 +50,12 @@ class loadFiles(object):
             for file in os.listdir(folder):  # secondary directory
                 file_path = os.path.join(folder, file)
                 if os.path.isfile(file_path):
-                    this_file = open(file_path, 'r', encoding='utf-8')
+                    this_file = open(file_path, 'r', encoding='gb18030', errors='ignore')
                     try:
                         content = this_file.read()
                     except UnicodeDecodeError:
-                        this_file = open(file_path, 'r', encoding='latin1')
-                        content = this_file.read()
+                        print(file_path)
+                        content = ''
                     yield catg, file, content
                     this_file.close()
 
@@ -62,13 +63,13 @@ class loadFiles(object):
 def convert_doc_to_wordlist(str_doc, cut_all):
     sent_list = str(str_doc).split('\n')
     # sent_list = map(rm_char, sent_list)  # 去掉一些字符，例如中文空格
-    jieba.load_userdict('use_words')
+    jieba.load_userdict('use_words_answers')
     word_2dlist = []
     for part in sent_list:
         list_all = jieba.posseg.cut(part.lower())
         list_numn = []
         for i in list_all:
-            if (i.flag not in ['eng', 'x', 'm', 'u', 'p', 'f', 'c', 'ul', 'uj', 'e']):
+            if(i.flag not in ['eng', 'x', 'm', 'u', 'p', 'f', 'c', 'ul', 'uj', 'e']):
                 list_numn.append(i.word)
         word_2dlist.append(rm_tokens(list_numn))
     word_list = sum(word_2dlist, [])
@@ -94,7 +95,7 @@ def rm_tokens(words):  # 去掉一些停用词和数字
     return words_list
 
 
-def get_stop_words(path='stop_words'):
+def get_stop_words(path='stop_words_answers'):
     file = open(path, 'r', encoding='utf-8')
     file = file.read().split('\n')
     return set(file)
@@ -148,23 +149,23 @@ def path_compare():
     ind = np.linspace(1, 9, 4)
     Y1 = [ER_graph_cluster, WS_graph_cluster, topic_map_cluster, lsi_graph_cluster]
     Y2 = [ER_graph_path, WS_graph_path, topicmap_path, lsi_graph_path]
-    labels = ['random', 'small world', 'TMC', 'KMC']
+    labels = ['random', 'small world', 'topic map', 'KMC']
     fig1 = plt.figure(1, dpi=250)
     ax1 = fig1.add_subplot(121)
     rect1 = ax1.bar(ind - width / 2, Y1, width)
     ax1.set_xticks(ind)
     ax1.set_ylabel('Clustering coefficient')
-    ax1.set_xticklabels(labels, fontsize='medium')
+    ax1.set_xticklabels(labels, fontsize='medium', rotation=15)
     add_labels(rect1)
     ax2 = fig1.add_subplot(122)
     rect2 = ax2.bar(ind - width / 2, Y2, width)
     ax2.set_xticks(ind)
     ax2.set_ylabel('average shortest path length')
     ax2.set_ylim(0, 10)
-    ax2.set_xticklabels(labels, fontsize='medium')
+    ax2.set_xticklabels(labels, fontsize='medium', rotation=15)
     add_labels(rect2)
     plt.subplots_adjust(left=0.08, bottom=0.30, right=0.98, top=0.70)
-    fig1.savefig('compare_with_networkx.pdf')
+    fig1.savefig(os.path.join(path_tmp, 'compare_with_networkx.pdf'))
 
 def add_labels(rects):
     for rect in rects:
@@ -190,7 +191,7 @@ def graph_average_degree():
             lda_degree_distr[value] += 1
         else:
             lda_degree_distr[value] = 1
-        if value >= 70:
+        if value >= 100:
             lda_higher_degree_nodes.append(key)
             print("lda:key %d, value %d" %(key, value))
 
@@ -221,7 +222,7 @@ def degree_distribution():
     X3.sort()
     X3_2 = range(1, 450)
     Y3_2 = 170 * scipy.power(X3_2, -1.5)
-    ax3.set_title('Degree distributions of the TMC topic map')
+    ax3.set_title('Degree distributions of the topic map')
     ax3.plot(X3_2, Y3_2, linewidth=1, color='r', markeredgewidth=0.5, label='$P(k)=\\alpha*k^{-\\beta}$')
     ax3.set_xlim(0, 500)
     ax3.set_ylim(-10, 100)
@@ -234,12 +235,12 @@ def degree_distribution():
     X4.sort()
     X4_2 = range(1, 450)
     Y4_2 = 250 * scipy.power(X4_2, -1.5)
-    ax4.set_title('Degree distributions of KMC knowledge map')
+    ax4.set_title('Degree distributions of KMC')
     ax4.plot(X4_2, Y4_2, linewidth=1, color='r', markeredgewidth=0.5, label='$P(k)=\\alpha*k^{-\\beta}$')
     ax4.set_xlim(0, 400)
     ax4.set_ylim(-10, 100)
     plt.legend()
-    fig2.savefig('degree distribution.pdf')
+    fig2.savefig(os.path.join(path_tmp, 'degree distribution.pdf'))
 
 
 def topicmap_draw():
@@ -322,7 +323,7 @@ def topicmap_draw():
     # ax6.set_title('topic_level')
     # plt.subplots_adjust(left=0, bottom=0, right=1, top=1, hspace = 0, wspace = 0)
     # plt.title('Topic map of seven topic')
-    # fig3.savefig('topic map.pdf')
+    # fig3.savefig(os.path.join(path_tmp, 'topic map.pdf'))
 
     fig5 = plt.figure(5, figsize=[10, 10])
     ax7 = fig5.add_subplot(111)
@@ -337,7 +338,7 @@ def topicmap_draw():
     ax7.set_title('topic_level')
     plt.subplots_adjust(left=0, bottom=0, right=1, top=1, hspace=0, wspace=0)
     plt.title('KMC of seven topic')
-    fig5.savefig('KMC map.pdf')
+    fig5.savefig(os.path.join(path_tmp, 'KMC map.pdf'))
 
 
 def effeciency_compute():
@@ -360,22 +361,22 @@ def effeciency_compute():
     for i, node in zip(range(len(lda_higher_degree_nodes)),lda_higher_degree_nodes):
         lda_degree_graph.remove_node(node)
         eff= ne.network_efficiency(lda_degree_graph)
-        if((len(lda_higher_degree_nodes)-i) > 5 and (lda_init_eff - eff) >= 0.004):
+        if((len(lda_higher_degree_nodes)-i) > 5 and (lda_init_eff - eff) >= 0.002):
             lda_effeciency_list.append(eff)
             lda_init_eff = eff
-            # imp_doc.write(str(node)+" & "+ docsTopic[fileTopicList[i]] +" & "+filenames[node]+" \\"+"\n")
+            imp_doc.write(str(node)+" & "+ docsTopic[fileTopicList[i]] +" & "+filenames[node]+" \\"+"\n")
             print("lda:剩余节点个数:%d, node:%d, effeciency:%f" % (lda_degree_graph.number_of_nodes(), node, eff))
         elif((len(lda_higher_degree_nodes)-i) <= 5):
             lda_effeciency_list.append(eff)
             imp_doc.write(str(node) + " & " + filenames[node] + " \\" + "\n")
             print("lda:剩余节点个数:%d, node:%d, effeciency:%f" % (lda_degree_graph.number_of_nodes(), node, eff))
     imp_doc.close()
-    ax5.scatter(range(1,len(lda_effeciency_list)+1), lda_effeciency_list, marker='x', label='TMC：按重要性删除节点', linewidth=1)
+    ax5.scatter(range(1,len(lda_effeciency_list)+1), lda_effeciency_list, marker='x', label='本论文方法：按重要性删除节点', linewidth=1)
     
     for i, node in zip(range(len(lsi_higher_degree_nodes)),lsi_higher_degree_nodes):
         lsi_degree_graph.remove_node(node)
         eff = ne.network_efficiency(lsi_degree_graph)
-        if ((len(lsi_higher_degree_nodes) - i) > 5 and (lsi_init_eff - eff) >= 0.004):
+        if ((len(lsi_higher_degree_nodes) - i) > 5 and (lsi_init_eff - eff) >= 0.002):
             lsi_effeciency_list.append(eff)
             lsi_init_eff = eff
             print("lsi:剩余节点个数:%d, node:%d, effeciency:%f" % (lsi_degree_graph.number_of_nodes(), node, eff))
@@ -390,7 +391,7 @@ def effeciency_compute():
             lda_random_graph.remove_node(node)
             eff = ne.network_efficiency(lda_random_graph)
             lda_random_effeciency_list.append(eff)
-    ax5.scatter(range(1, len(lda_random_effeciency_list)+1), lda_random_effeciency_list, marker='x', c='r',label='TMC：随机删除节点', linewidth=1)
+    ax5.scatter(range(1, len(lda_random_effeciency_list)+1), lda_random_effeciency_list, marker='x', c='r',label='本论文方法：随机删除节点', linewidth=1)
 
     for i in range(len(lsi_effeciency_list)+1):
         node = random.randint(0,1212)
@@ -399,12 +400,12 @@ def effeciency_compute():
             eff = ne.network_efficiency(lsi_random_graph)
             lsi_random_effeciency_list.append(eff)
     ax5.scatter(range(1, len(lsi_random_effeciency_list)+1), lsi_random_effeciency_list, marker='o', c='r',label='KMC：随机删除节点', linewidth=1)
-    ax5.set_xlim(0, 40)
+    ax5.set_xlim(0, 60)
     ax5.xaxis.grid(True, which='major')  # x坐标轴的网格使用主刻度
     ax5.yaxis.grid(True, which='major')  # x坐标轴的网格使用主刻度
     plt.legend(loc='lower left')
     plt.title('network efficiency')
-    fig4.savefig('network efficiency.pdf')
+    fig4.savefig(os.path.join(path_tmp, 'network efficiency.pdf'))
 
 
 def topic_associate():
@@ -458,8 +459,8 @@ def topic_associate():
 
 
 if __name__ == '__main__':
-    path_doc_root = '../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
-    path_tmp = '../datasets/csdn_tmp_%s'%argv[1]  # 存放中间结果的位置
+    path_doc_root = '../datasets/answers'  # 根目录 即存放按类分类好的文本集
+    path_tmp = '../datasets/answers_tmp_%s'%argv[1]  # 存放中间结果的位置
     path_dictionary = os.path.join(path_tmp, 'THUNews.dict')
     path_tmp_corpus = os.path.join(path_tmp, 'corpus')
     path_tmp_tfidf = os.path.join(path_tmp, 'tfidf_corpus')
@@ -471,7 +472,7 @@ if __name__ == '__main__':
     path_temp_filenames = os.path.join(path_tmp, 'filenames')
     path_temp_topicmaps = os.path.join(path_tmp, 'topic_map')
     lsi_path_temp_topicmaps = os.path.join(path_tmp, 'lsi_topic_map')
-    n = 5  # n 表示抽样率， n抽1
+    n = 1  # n 表示抽样率， n抽1
     n_topic = 50
 
     dictionary = None
@@ -494,6 +495,8 @@ if __name__ == '__main__':
         dictionary = corpora.Dictionary()
         files = loadFiles(path_doc_root)
         filenames_file = open(path_temp_filenames, 'w', encoding='utf-8')
+        init_catg = ['C11-Space','C19-Computer','C3-Art','C31-Enviornment','C32-Agriculture',
+                     'C34-Economy','C38-Politics','C39-Sports','C7-History']
         for i, msg in enumerate(files):
             if i % n == 0:
                 catg = msg[0]
@@ -502,9 +505,9 @@ if __name__ == '__main__':
                 content = content + filename * int(argv[1])
                 word_list = convert_doc_to_wordlist(content, cut_all=False)
                 dictionary.add_documents([word_list])
-                filenames.append(filename)
+                index = init_catg.index(catg)
                 # 将所有文件名存储到一个文件中，方便以后使用
-                filenames_file.writelines(filename+'\n')
+                filenames_file.writelines(filename+'\t'+str(index)+'\n')
                 if int(i / n) % 1000 == 0:
                     print('{t} *** {i} \t docs has  been dealed'
                           .format(i=i, t=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())))
@@ -641,6 +644,47 @@ if __name__ == '__main__':
         lsi_model = pkl.load(lsi_file, encoding="utf-8")
         print('--- lda文档读取完毕，开始进行分类 ---')
 
+    # 从文件中读取filenames并转化为列表形式
+    filenames = []
+    tag_list = []
+    f = open(path_temp_filenames, 'r', encoding='utf-8')
+    for line in f:
+        filenames.append(line.strip('\n').split('\t')[0])
+        tag_list.append(int(line.strip('\n').split('\t')[1]))
+    f.close()
+    data = []
+    rows = []
+    cols = []
+    line_count = 0
+    for line in corpus_lsi:
+        for elem in line:
+            rows.append(line_count)
+            cols.append(elem[0])
+            data.append(elem[1])
+        line_count += 1
+    lsi_matrix = csr_matrix((data, (rows, cols))).toarray()
+    rarray = np.random.random(size=line_count)
+    train_set = []
+    train_tag = []
+    test_set = []
+    test_tag = []
+    for i in range(line_count):
+        if rarray[i] < 0.2:
+            train_set.append(lsi_matrix[i, :])
+            train_tag.append(tag_list[i])
+        else:
+            test_set.append(lsi_matrix[i, :])
+            test_tag.append(tag_list[i])
+    print('训练集的长度为：%d' % len(test_tag))
+    clf = svm.LinearSVC()  # 使用线性核
+    clf_res = clf.fit(train_set, train_tag)
+    train_pred = clf_res.predict(train_set)
+    test_pred = clf_res.predict(test_set)
+    count = 0
+    for i in range(len(test_pred)):
+        if test_pred[i] == test_tag[i]:
+            count = count + 1
+    print("svm准确率为%f" % (count / len(test_pred)))
     t4 = time.time()
     print("第四阶段用时：%d" % (t4-t3))
 
@@ -650,7 +694,7 @@ if __name__ == '__main__':
     lda_model.optimize_eta = True
     lda_model.do_mstep(rho=0.30, other=ldaState)
 
-    topic = lda_model.show_topics(n_topic, 20)
+    topic = lda_model.show_topics(n_topic, 5)
     print(topic)
 
     # # ===================================================================
@@ -777,7 +821,7 @@ if __name__ == '__main__':
     # 比较三种地图的聚集度和平均最短路径
     path_compare()
     # # 主题地图的幂分布
-    # degree_distribution()
+    degree_distribution()
     # # 绘制主题地图
     # topicmap_draw()
     # # 网络效率的计算

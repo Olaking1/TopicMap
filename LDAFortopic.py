@@ -16,6 +16,7 @@ from pylab import mpl
 import network_extension as ne
 import random
 import matplotlib.colors as col
+from sys import argv
 mpl.rcParams['font.sans-serif'] = ['kaiti']  # 指定默认字体
 mpl.rcParams['axes.unicode_minus'] = False  # 解决保存图像是负号'-'显示为方块的问题
 
@@ -99,7 +100,7 @@ def accuracy(filenames, fileTopicList): # 计算分类的正确性
     count = 0
     # lda训练后，每个主题下的文档的个数
     global docsTopic
-    docsTopic = ['mongodb','hbase','mysql','hadoop','linux','docker','hbase','mybatis']
+    docsTopic = ['docker','mongodb','hadoop','linux','mybatis','mysql','hbase','hbase']
     topic_occurence = {docsTopic[k]: fileTopicList.count(k) for k in set(fileTopicList)}
     print("分类后每个主题下的文档个数："+str(topic_occurence))
     # 分类正确的文档数
@@ -135,13 +136,13 @@ def path_compare():
     WS_graph = nx.random_graphs.watts_strogatz_graph(len(nx.nodes(graph)), int(average_degree) * 2, 0.0158)
     WS_graph_cluster = nx.average_clustering(WS_graph)
     WS_graph_path = nx.average_shortest_path_length(WS_graph)
+    max_lsi_subgraph_cluster = nx.average_clustering(max_lsi_subgraph)
+    max_lsi_subgraph_path = nx.average_shortest_path_length(max_lsi_subgraph)
     width = 1
-    ind = np.linspace(1, 9, 3)
-    # Y1 = [regular_graph_cluster, ER_graph_cluster, WS_graph_cluster, topic_map_cluster]
-    # Y2 = [regular_graph_path, ER_graph_path, WS_graph_path, topicmap_path]
-    Y1 = [ER_graph_cluster, WS_graph_cluster, topic_map_cluster]
-    Y2 = [ER_graph_path, WS_graph_path, topicmap_path]
-    labels = ['random', 'small world', 'topic map']
+    ind = np.linspace(1, 9, 4)
+    Y1 = [ER_graph_cluster, WS_graph_cluster, topic_map_cluster, max_lsi_subgraph_cluster]
+    Y2 = [ER_graph_path, WS_graph_path, topicmap_path, max_lsi_subgraph_path]
+    labels = ['random', 'small world', 'topic map', 'KMU']
     fig1 = plt.figure(1, dpi=250)
     ax1 = fig1.add_subplot(121)
     rect1 = ax1.bar(ind - width / 2, Y1, width)
@@ -158,7 +159,6 @@ def path_compare():
     add_labels(rect2)
     plt.subplots_adjust(left=0.08, bottom=0.30, right=0.98, top=0.70)
     fig1.savefig('compare_with_networkx.pdf')
-
 
 def add_labels(rects):
     for rect in rects:
@@ -205,7 +205,7 @@ def degree_distribution():
     ax3.set_xlim(0, 300)
     ax3.set_ylim(-20, 100)
     plt.legend()
-    fig2.savefig('degree distribution.jpeg')
+    fig2.savefig('degree distribution.pdf')
 
 
 def topicmap_draw():
@@ -215,20 +215,20 @@ def topicmap_draw():
     elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] >= 0.90]
     esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d['weight'] < 0.90]
     nodeList_0 = [n for (n, d) in graph.nodes(data=True) if d['topic']==0]
-    nodeList_1 = [n for (n, d) in graph.nodes(data=True) if d['topic']==1 or d['topic']==6]
-    nodeList_2 = [n for (n, d) in graph.nodes(data=True) if d['topic']==2]
+    nodeList_1 = [n for (n, d) in graph.nodes(data=True) if d['topic']==1]
+    nodeList_2 = [n for (n, d) in graph.nodes(data=True) if d['topic']==2 or d['topic']==7]
     nodeList_3 = [n for (n, d) in graph.nodes(data=True) if d['topic']==3]
     nodeList_4 = [n for (n, d) in graph.nodes(data=True) if d['topic']==4]
     nodeList_5 = [n for (n, d) in graph.nodes(data=True) if d['topic']==5]
-    nodeList_7 = [n for (n, d) in graph.nodes(data=True) if d['topic']==7]
+    nodeList_7 = [n for (n, d) in graph.nodes(data=True) if d['topic']==6]
     # nodeColor = [d['topic'] for (n, d) in graph.nodes(data=True)]
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_0, node_color='#577a4d', node_size=300)
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_1, node_color='#2e46c0', node_size=300)
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_2, node_color='#f59422', node_size=300)
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_3, node_color='#faf214', node_size=300)
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_4, node_color='#ea2ec4', node_size=300)
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_5, node_color='#bd2309', node_size=300)
-    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_7, node_color='#1480fa', node_size=300)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_0, node_color='#577a4d', node_size=50)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_1, node_color='#2e46c0', node_size=50)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_2, node_color='#f59422', node_size=50)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_3, node_color='#faf214', node_size=50)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_4, node_color='#ea2ec4', node_size=50)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_5, node_color='#bd2309', node_size=50)
+    nx.draw_networkx_nodes(graph, pos1, nodelist=nodeList_7, node_color='#1480fa', node_size=50)
     nx.draw_networkx_edges(graph, pos1, edgelist=elarge, width=2)
     nx.draw_networkx_edges(graph, pos1, edgelist=esmall, width=1)
     # nx.draw_networkx_labels(graph, pos, font_size=10, font_family='sans-serif')
@@ -269,12 +269,12 @@ def topicmap_draw():
     elarge = [(u, v) for (u, v, d) in t_graph.edges(data=True) if d['width'] == 2]
     esmall = [(u, v) for (u, v, d) in t_graph.edges(data=True) if d['width'] == 1]
     nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Mongodb'], node_color='#577a4d', node_size=500)
-    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Mybatis'], node_color='#1480fa', node_size=500)
-    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Linux'], node_color='#ea2ec4', node_size=500)
-    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Mysql'], node_color='#f59422', node_size=500)
-    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Hbase'], node_color='#2e46c0', node_size=500)
-    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Docker'], node_color='#bd2309', node_size=500)
+    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Linux'], node_color='#2e46c0', node_size=500)
+    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Hbase'], node_color='#f59422', node_size=500)
     nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Hadoop'], node_color='#faf214', node_size=500)
+    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Docker'], node_color='#ea2ec4', node_size=500)
+    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Mysql'], node_color='#bd2309', node_size=500)
+    nx.draw_networkx_nodes(t_graph, pos2, nodelist=['Mybatis'], node_color='#1480fa', node_size=500)
     nx.draw_networkx_edges(t_graph, pos2, edgelist=elarge, width=10)
     nx.draw_networkx_edges(t_graph, pos2, edgelist=esmall, width=1)
     nx.draw_networkx_labels(t_graph, pos2, font_size=15)
@@ -288,7 +288,7 @@ def topicmap_draw():
     ax6.set_title('topic_level')
     plt.subplots_adjust(left=0, bottom=0, right=1, top=1, hspace = 0, wspace = 0)
     plt.title('Topic map of eight topic')
-    fig3.savefig('topic map.jpeg')
+    fig3.savefig('topic map.pdf')
 
 def effeciency_compute():
     fig4 = plt.figure(4)
@@ -327,7 +327,7 @@ def effeciency_compute():
     ax5.yaxis.grid(True, which='major')  # x坐标轴的网格使用主刻度
     plt.legend(loc='lower left')
     plt.title('network efficiency')
-    fig4.savefig('network efficiency.jpeg')
+    fig4.savefig('network efficiency.pdf')
 
 
 def topic_associate():
@@ -362,8 +362,8 @@ def topic_associate():
         doc_sum_dict[t_i] = temp_dict
 
     topic_similarity = {}
-    a = 0.1
-    b = 0.9
+    a = 0
+    b = 1
     for i in range(n_topic):
         temp_dict = {}
         for j in range(n_topic):
@@ -381,7 +381,7 @@ def topic_associate():
 
 if __name__ == '__main__':
     path_doc_root = '../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
-    path_tmp = '../datasets/csdn_tmp'  # 存放中间结果的位置
+    path_tmp = '../datasets/csdn_tmp_%s'%argv[1]  # 存放中间结果的位置
     path_dictionary = os.path.join(path_tmp, 'THUNews.dict')
     path_tmp_corpus = os.path.join(path_tmp, 'corpus')
     path_tmp_tfidf = os.path.join(path_tmp, 'tfidf_corpus')
@@ -421,7 +421,7 @@ if __name__ == '__main__':
                 catg = msg[0]
                 filename = msg[1]
                 content = msg[2]
-                content = content + filename * 4
+                content = content + filename * int(argv[1])
                 word_list = convert_doc_to_wordlist(content, cut_all=False)
                 dictionary.add_documents([word_list])
                 filenames.append(filename)
@@ -597,20 +597,26 @@ if __name__ == '__main__':
     # # ===================================================================
     # # # # 第七阶段，  画出主题地图，并计算各网络的相关参数
     if not os.path.exists(path_temp_topicmaps):
+        t5 = time.time()
+        path = '{f}{s}{c}.mm'.format(f=path_tmp_tfidf, s=os.sep, c='tf-idf')
+        corpus_tfidf = corpora.MmCorpus(path)
         graph = nx.Graph()
         doc_index = similarities.MatrixSimilarity(corpus=corpus_lda, num_features=len(dictionary))
         for i, similars in zip(range(len(filenames)), doc_index):
             fileTopicI = lda_model.get_document_topics(corpus_tfidf[i], minimum_phi_value=0.02)
             fileTopicI.sort(key=lambda x: x[1], reverse=True)
             for j in range(len(similars)):
-                if(similars[j] >0.80 and similars[j] < 0.99):
+                if(similars[j] >0.75 and similars[j] < 0.99):
                     graph.add_node(i, topic=fileTopicI[0][0])
                     graph.add_edge(i,j, weight=similars[j])
         nx.write_gml(graph, path_temp_topicmaps, stringizer=str)
+        t6 = time.time()
+        print("本阶段用时：%d"%(t6-t5))
     else:
         graph = nx.read_gml(path_temp_topicmaps, destringizer=float)
 
     if not os.path.exists(lsi_path_temp_topicmaps):
+        t7 = time.time()
         lsi_graph = nx.Graph()
         for i in range(len(filenames)):
             lsi_graph.add_node(i)
@@ -628,18 +634,36 @@ if __name__ == '__main__':
         m, n = divmod(position, column)
         lsi_graph.add_edge(m, n, weight=sim_between_doc[m][n])
         sim_between_doc[m][n] = -2
+        sim_between_doc[n][m] = -2
         count=0
-        # 此处是死循环
-        while not nx.is_connected(lsi_graph) and np.max(sim_between_doc) > 0:
+        while (not nx.is_connected(lsi_graph)) and np.max(sim_between_doc) > 0.75:
             position = np.argmax(sim_between_doc)
             m, n = divmod(position, column)
             lsi_graph.add_edge(m, n, weight=sim_between_doc[m][n])
+            if(count % 1000 == 0):
+                print("循环第%d次，当前边数为%d，当前相似度为%f"% (count, lsi_graph.number_of_edges(), sim_between_doc[m][n]))
+                print("当前的子图个数为:%d"% nx.number_connected_components(lsi_graph))
             sim_between_doc[m][n] = -2
+            sim_between_doc[n][m] = -2
             count = count+1
-            print("循环第%d次"% count)
-        nx.write_gml(lsi_graph, lsi_path_temp_topicmaps, stringizer=str)
+        print("============循环结束==============")
+        print("连通子图的节点个数分别为:")
+        g = nx.connected_component_subgraphs(lsi_graph)
+        max_nodes = 0
+        max_lsi_subgraph = nx.Graph()
+        for item in g:
+            print(item.number_of_nodes())
+            if(item.number_of_nodes() < 50):
+                print("小子图中结点为%s"%str(item.nodes()))
+            if(item.number_of_nodes() > max_nodes):
+                max_nodes = item.number_of_nodes()
+                max_lsi_subgraph = item
+        print("++++++++++++++++++++++++++++++++++")
+        nx.write_gml(max_lsi_subgraph, lsi_path_temp_topicmaps, stringizer=str)
+        t8 = time.time()
+        print("lsi地图用时%d"%(t8-t7))
     else:
-        lsi_graph = nx.read_gml(lsi_path_temp_topicmaps, destringizer=float)
+        max_lsi_subgraph = nx.read_gml(lsi_path_temp_topicmaps, destringizer=float)
 
     # ===================================================================
     # # # 第五阶段，  计算主题之间的相似度
