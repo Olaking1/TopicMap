@@ -465,8 +465,8 @@ def topic_associate():
 
 
 if __name__ == '__main__':
-    path_doc_root = '../datasets/answers'  # 根目录 即存放按类分类好的文本集
-    path_tmp = '../datasets/answers_tmp_%s'%argv[1]  # 存放中间结果的位置
+    path_doc_root = '../datasets/csdn_after'  # 根目录 即存放按类分类好的文本集
+    path_tmp = '../datasets/csdn_tmp_%s'%argv[1]  # 存放中间结果的位置
     path_dictionary = os.path.join(path_tmp, 'THUNews.dict')
     path_tmp_corpus = os.path.join(path_tmp, 'corpus')
     path_tmp_tfidf = os.path.join(path_tmp, 'tfidf_corpus')
@@ -662,7 +662,7 @@ if __name__ == '__main__':
     rows = []
     cols = []
     line_count = 0
-    for line in corpus_lda:
+    for line in corpus_lsi:
         for elem in line:
             rows.append(line_count)
             cols.append(elem[0])
@@ -688,7 +688,6 @@ if __name__ == '__main__':
     print('训练集的长度为：%d' % len(test_tag))
     clf = svm.LinearSVC()  # 使用线性核
     clf_res = clf.fit(train_set, train_tag)
-
     test_pred = clf_res.predict(test_set)
     precision, recall, fb, support = precision_recall_fscore_support(test_tag, test_pred, labels=[0,1,2,3,4,5,6], average='micro')
     print("svm准确率为%s" % str(precision))
@@ -702,11 +701,11 @@ if __name__ == '__main__':
     t4 = time.time()
     print("第四阶段用时：%d" % (t4-t3))
 
-    # gamma = lda_model.do_estep(corpus)
-    # lda_model.update_alpha(gamma, 0.7)
-    # ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
-    # lda_model.optimize_eta = True
-    # lda_model.do_mstep(rho=0.30, other=ldaState)
+    gamma = lda_model.do_estep(corpus)
+    lda_model.update_alpha(gamma, 0.7)
+    ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
+    lda_model.optimize_eta = True
+    lda_model.do_mstep(rho=0.30, other=ldaState)
 
     topic = lda_model.show_topics(n_topic, 5)
     print(topic)
