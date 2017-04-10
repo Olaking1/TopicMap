@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import gensim
 from gensim import corpora, models, similarities
-from sklearn.cluster import KMeans
 from sklearn import svm
-from sklearn.naive_bayes import GaussianNB
 from scipy.sparse import csr_matrix
 from sklearn.metrics import precision_recall_fscore_support
+from sklearn import preprocessing
 import numpy as np
 import scipy
 import string
@@ -416,12 +415,23 @@ def effeciency_compute():
 
 def topic_associate():
     # 通过词项计算主题间的相关性
-    topn = 300
-    for i in range(n_topic):
-        topic_term_pro = lda_model.get_topic_terms(i, topn=topn * 50)
-        topic_term = [(id, pro) for (id, pro) in topic_term_pro]
-        corpus_topic.append(topic_term)
-    topic_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=corpus_topic,
+    all_tag = train_tag + test_tag
+    class_matrix = []
+    for i in range(n_class):
+        class_matrix.append([])
+    for i, label in zip(range(len(all_tag)), all_tag):
+        exist_item = []
+        for j in range(len(class_matrix[label])):
+            exist_item.append(class_matrix[label][j][0])
+        for k in corpus_lda[i]:
+            if(k[1] > 0.4):
+                if k[0] in exist_item:
+                    index = exist_item.index(k[0])
+                    result = class_matrix[label][index][1] + k[1]
+                    class_matrix[label][index] = (class_matrix[label][index][0], result)
+                else:
+                    class_matrix[label].append(k)
+    topic_index = similarities.docsim.Similarity(output_prefix=path_tmp, corpus=class_matrix,
                                                  num_features=len(dictionary))
     top_sum_dict = {}#list的字典
     for i, t_similars in zip(range(n_topic), topic_index):
@@ -429,29 +439,29 @@ def topic_associate():
 
     # 通过文档计算主题间的相似性
     doc_sum_dict = {} #字典的字典，用于存放所有主题间关系的字典{0:{1:0.32,1:0.11},1:{...}}
-    topic_occurence = {k: fileTopicList.count(k) for k in set(fileTopicList)}
-    for t_i in range(n_topic):
+    topic_occurence = {k: all_tag.count(k) for k in set(all_tag)}
+    for t_i in range(n_class):
         temp_dict = {}#用于存放某主题与其他主题间的关系的字典{1:0.32,1:0.11}
-        for t_j in range(n_topic):
+        for t_j in range(n_class):
             count = 0
             sum_simi = 0
-            for index, topic in zip(range(len(fileTopicList)),fileTopicList):
+            for index, topic in zip(range(len(all_tag)),all_tag):
                 if(topic == t_i and graph.has_node(index)):
                     simi_list = graph.neighbors(index)
                     for item in simi_list:
-                        if(fileTopicList[item] == t_j):
+                        if(all_tag[item] == t_j):
                             count = count+1
                             sum_simi = sum_simi + graph.get_edge_data(index, item)['weight']
-            # temp_dict[t_j] = 2*sum_simi/(topic_occurence[t_i]+topic_occurence[t_j]+2*count)
-            temp_dict[t_j] = 2*count/(topic_occurence[t_i]+topic_occurence[t_j]+2*count)
+            temp_dict[t_j] = 2*sum_simi/(topic_occurence[t_i]+topic_occurence[t_j]+2*count)
+            # temp_dict[t_j] = 2*count/(topic_occurence[t_i]+topic_occurence[t_j]+2*count)
         doc_sum_dict[t_i] = temp_dict
 
     topic_similarity = {}
     a = 0.2
     b = 0.8
-    for i in range(n_topic):
+    for i in range(n_class):
         temp_dict = {}
-        for j in range(n_topic):
+        for j in range(n_class):
             if(i == j):
                 temp_dict[j] = top_sum_dict[i][j]
             else:
@@ -480,6 +490,7 @@ if __name__ == '__main__':
     lsi_path_temp_topicmaps = os.path.join(path_tmp, 'lsi_topic_map')
     n = 5  # n 表示抽样率， n抽1
     n_topic = 100
+    n_class = 9
 
     dictionary = None
     corpus = []
@@ -586,8 +597,7 @@ if __name__ == '__main__':
         # 生成lda model和lsi model
         os.makedirs(path_tmp_lda)
         os.makedirs(path_tmp_lsi)
-        lda_model = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=n_topic, alpha=0.1,
-                                    eval_every=1, iterations=100)
+        lda_model = models.LdaModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=n_topic, minimum_probability=0.02)
         lsi_model = models.LsiModel(corpus=corpus_tfidf, id2word=dictionary, num_topics=n_topic)
 
         # 将lda和lsi模型存储到磁盘上
@@ -674,8 +684,6 @@ if __name__ == '__main__':
     train_tag = []
     test_set = []
     test_tag = []
-    all_set = []
-    all_tag = []
     for i in range(line_count):
         if rarray[i] < 0.5:
             train_set.append(lsi_matrix[i, :])
@@ -683,22 +691,14 @@ if __name__ == '__main__':
         else:
             test_set.append(lsi_matrix[i, :])
             test_tag.append(tag_list[i])
-        all_set.append(lsi_matrix[i, :])
-        all_tag.append(tag_list[i])
     print('训练集的长度为：%d' % len(test_tag))
     clf = svm.LinearSVC()  # 使用线性核
     clf_res = clf.fit(train_set, train_tag)
 
     test_pred = clf_res.predict(test_set)
-    precision, recall, fb, support = precision_recall_fscore_support(test_tag, test_pred, labels=[0,1,2,3,4,5,6], average='micro')
+    precision, recall, fb, support = precision_recall_fscore_support(test_tag, test_pred, labels=range(9), average='micro')
     print("svm准确率为%s" % str(precision))
     print("svm召回率为%s" % str(recall))
-    gnb = GaussianNB()
-    test_pred = gnb.fit(train_set, train_tag).predict(test_set)
-    precision, recall, fb, support = precision_recall_fscore_support(test_tag, test_pred, labels=[0, 1, 2, 3, 4, 5, 6],
-                                                                     average='micro')
-    print("beyes准确率为%s" % str(precision))
-    print("beyes召回率为%s" % str(recall))
     t4 = time.time()
     print("第四阶段用时：%d" % (t4-t3))
 
@@ -707,16 +707,6 @@ if __name__ == '__main__':
     # ldaState = models.ldamodel.LdaState(eta=0.3, shape=(lda_model.num_topics, lda_model.num_terms))
     # lda_model.optimize_eta = True
     # lda_model.do_mstep(rho=0.30, other=ldaState)
-
-    topic = lda_model.show_topics(n_topic, 5)
-    print(topic)
-
-    fileTopicList = []
-    for j in range(len(filenames)):
-        fileTopic = lda_model.get_document_topics(corpus[j], minimum_phi_value=0.02)
-        topicList = lda_model.get_topic_terms(1,10)
-        fileTopic.sort(key=lambda x:x[1], reverse=True)
-        fileTopicList.append(fileTopic[0][0])
 
     # accuracy = accuracy(filenames, fileTopicList)
     # print(accuracy)
@@ -820,16 +810,16 @@ if __name__ == '__main__':
 
     # ===================================================================
     # # # 第五阶段，  计算主题之间的相似度
-    # topic_similarity = topic_associate()
-    # print("主题间的相似度为：" + str(topic_similarity))
-    # print("=======================")
+    topic_similarity = topic_associate()
+    print("主题间的相似度为：" + str(topic_similarity))
+    print("=======================")
 
     # 比较三种地图的聚集度和平均最短路径
-    path_compare()
-    # # 主题地图的幂分布
-    # degree_distribution()
-    # # 绘制主题地图
-    # topicmap_draw()
-    # # 网络效率的计算
-    effeciency_compute()
-    plt.show()
+    # path_compare()
+    # # # 主题地图的幂分布
+    # # degree_distribution()
+    # # # 绘制主题地图
+    # # topicmap_draw()
+    # # # 网络效率的计算
+    # effeciency_compute()
+    # plt.show()
